@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sherlock — Codebase Intelligence & Architecture Explorer</title>
+  <link rel="stylesheet" href="/style.css">
+  <!-- Mermaid.js for interactive diagrams -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      securityLevel: 'loose',
+      themeVariables: {
+        darkMode: true,
+        background: '#0d1117',
+        primaryColor: '#238636',
+        primaryBorderColor: '#2ea043',
+        lineColor: '#58a6ff'
+      }
+    });
+  </script>
+</head>
+<body>
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo">
+        <span class="magnifier">🔍</span>
+        <span class="logo-title">SHERLOCK</span>
+        <span class="badge badge-subtle">V1.0 ARCHITECTURE EXPLORER</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="ollama-status-badge" class="status-pill status-checking">
+        <span class="dot"></span>
+        <span id="ollama-status-text">Checking Ollama...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="main-layout">
+    <!-- Analysis Starter Bar -->
+    <section class="analysis-bar-container">
+      <div class="analysis-bar">
+        <div class="input-group">
+          <label for="project-path-input">Repository Path:</label>
+          <input 
+            type="text" 
+            id="project-path-input" 
+            placeholder="/absolute/path/to/project (e.g. /Users/alisha/Desktop/Sherlock)" 
+            value="/Users/alisha/Desktop/Sherlock"
+          />
+        </div>
+        <button id="btn-analyze" class="btn btn-primary">
+          <span class="btn-icon">⚡</span> Analyze Codebase
+        </button>
+      </div>
+
+      <!-- Agent Pipeline Progress Widget -->
+      <div id="pipeline-progress" class="pipeline-card hidden">
+        <div class="pipeline-header">
+          <div class="pipeline-title">
+            <span>Multi-Agent Pipeline Execution</span>
+            <span id="active-agent-label" class="current-tag">Initializing</span>
+          </div>
+          <span id="analysis-id-badge" class="text-muted"></span>
+        </div>
+        
+        <div class="agents-grid">
+          <div class="agent-chip" id="chip-mapper">
+            <span class="agent-status-icon">⏳</span>
+            <div class="agent-info">
+              <strong>1. Repository Mapper</strong>
+              <small>Structure & Tech Stack</small>
+            </div>
+          </div>
+          <div class="agent-chip" id="chip-flows">
+            <span class="agent-status-icon">⏳</span>
+            <div class="agent-info">
+              <strong>2. Flow Tracer</strong>
+              <small>Routes & Workflows</small>
+            </div>
+          </div>
+          <div class="agent-chip" id="chip-components">
+            <span class="agent-status-icon">⏳</span>
+            <div class="agent-info">
+              <strong>3. Component Analyst</strong>
+              <small>Inputs, Outputs & Side-effects</small>
+            </div>
+          </div>
+          <div class="agent-chip" id="chip-data">
+            <span class="agent-status-icon">⏳</span>
+            <div class="agent-info">
+              <strong>4. Data Analyst</strong>
+              <small>DBs, APIs & ML Integration</small>
+            </div>
+          </div>
+          <div class="agent-chip" id="chip-gaps">
+            <span class="agent-status-icon">⏳</span>
+            <div class="agent-info">
+              <strong>5. Gap Analyst</strong>
+              <small>Issues & Opportunities</small>
+            </div>
+          </div>
+          <div class="agent-chip" id="chip-teacher">
+            <span class="agent-status-icon">⏳</span>
+            <div class="agent-info">
+              <strong>6. Teacher Agent</strong>
+              <small>25-Question Mental Model</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Report Layout: Sidebar & Content View -->
+    <div id="report-container" class="report-layout hidden">
+      <!-- 10-Page Sidebar Navigation -->
+      <nav class="report-sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-title">10-PAGE BRIEFING</span>
+          <span id="sidebar-project-name" class="sidebar-project"></span>
+        </div>
+        <ul class="nav-pages-list">
+          <li class="nav-item active" data-page="1">
+            <span class="page-num">01</span>
+            <span class="page-name">Project Overview</span>
+          </li>
+          <li class="nav-item" data-page="2">
+            <span class="page-num">02</span>
+            <span class="page-name">Repository Map</span>
+          </li>
+          <li class="nav-item" data-page="3">
+            <span class="page-num">03</span>
+            <span class="page-name">Architecture</span>
+          </li>
+          <li class="nav-item" data-page="4">
+            <span class="page-num">04</span>
+            <span class="page-name">Routes & Interfaces</span>
+          </li>
+          <li class="nav-item" data-page="5">
+            <span class="page-num">05</span>
+            <span class="page-name">Execution Flows</span>
+          </li>
+          <li class="nav-item" data-page="6">
+            <span class="page-num">06</span>
+            <span class="page-name">Component Explorer</span>
+          </li>
+          <li class="nav-item" data-page="7">
+            <span class="page-num">07</span>
+            <span class="page-name">Data & Integrations</span>
+          </li>
+          <li class="nav-item" data-page="8">
+            <span class="page-num">08</span>
+            <span class="page-name">Gaps & Issues</span>
+          </li>
+          <li class="nav-item" data-page="9">
+            <span class="page-num">09</span>
+            <span class="page-name">Concepts to Learn</span>
+          </li>
+          <li class="nav-item highlight-item" data-page="10">
+            <span class="page-num">10</span>
+            <span class="page-name">Teacher / Mental Model</span>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Page Content Viewer -->
+      <main class="report-viewer">
+        <div class="page-header-bar">
+          <div>
+            <h1 id="page-title">Project Overview</h1>
+            <p id="page-subtitle" class="text-muted">Loading codebase understanding...</p>
+          </div>
+          <div class="page-header-actions">
+            <button id="btn-prev-page" class="btn btn-secondary btn-sm" disabled>← Previous</button>
+            <span id="page-indicator" class="page-counter">Page 1 of 10</span>
+            <button id="btn-next-page" class="btn btn-secondary btn-sm">Next →</button>
+          </div>
+        </div>
+
+        <!-- Render Target for Active Page -->
+        <div id="page-body" class="page-body">
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Gathering intelligence...</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Interactive Code Viewer Modal -->
+  <div id="code-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">📄</span>
+          <span id="modal-filepath" class="modal-title">Source Viewer</span>
+        </div>
+        <button id="btn-close-modal" class="btn-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <pre id="modal-code-content" class="code-block"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
