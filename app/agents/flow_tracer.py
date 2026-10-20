@@ -150,7 +150,7 @@ class FlowTracerAgent(BaseAgent):
                 component="Local Ollama LLM / Disk Artifacts",
                 file="app/llm/ollama_client.py",
                 function_name="generate_structured()",
-                description="Queries local Ollama model (qwen3-coder:30b-16k) and persists JSON artifacts to workspace/.",
+                description="Queries local Ollama model (qwen3-coder:30b) and persists JSON artifacts to workspace/.",
             ),
             FlowStep(
                 step_number=7,

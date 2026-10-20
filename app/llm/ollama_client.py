@@ -70,6 +70,7 @@ class OllamaClient:
             "stream": False,
             "options": {
                 "temperature": temperature,
+                "num_ctx": self.cfg.context_window,
             },
         }
 
@@ -120,7 +121,10 @@ class OllamaClient:
                 "messages": messages,
                 "format": "json",
                 "stream": False,
-                "options": {"temperature": temperature},
+                "options": {
+                    "temperature": temperature,
+                    "num_ctx": self.cfg.context_window,
+                },
             }
 
             try:

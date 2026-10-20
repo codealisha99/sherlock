@@ -102,7 +102,7 @@ class TeacherAgent(BaseAgent):
             ConceptToLearn(
                 concept="Local LLM Inference with Ollama",
                 definition="Running open-weights language models locally via a self-hosted server process, avoiding external API costs and cloud data transfer.",
-                why_relevant_here="All neural reasoning and synthesis runs locally on Ollama using qwen3-coder:30b-16k.",
+                why_relevant_here="All neural reasoning and synthesis runs locally on Ollama using qwen3-coder:30b.",
                 where_used_in_project="app/llm/ollama_client.py, config.py",
             ),
             ConceptToLearn(
@@ -153,7 +153,7 @@ class TeacherAgent(BaseAgent):
                 trade_offs="Static AST analysis cannot capture dynamic runtime metaprogramming, but provides complete safety and high speed.",
             ),
             ArchitectureDecision(
-                decision="Local Ollama Inference (qwen3-coder:30b-16k)",
+                decision="Local Ollama Inference (qwen3-coder:30b)",
                 rationale="Ensures total code privacy—no proprietary customer code leaves the user's workstation.",
                 trade_offs="Requires local hardware with sufficient VRAM/RAM, mitigated by Sherlock's static AST synthesis fallback.",
             ),
@@ -168,7 +168,7 @@ class TeacherAgent(BaseAgent):
             "1. What is this project?": f"{proj_name} is a local multi-agent codebase-understanding system that analyzes unfamiliar repositories and builds a deep, structured mental model.",
             "2. Why does it exist?": "Developers spend up to 70% of their time reading and trying to comprehend unfamiliar code rather than writing new code. Sherlock automates this onboarding process.",
             "3. What problem does it solve?": "It bridges the gap between seeing a wall of files and understanding how the system actually executes, where data flows, and what architectural decisions were made.",
-            "4. What technologies does it use?": f"Python ({', '.join(langs[:3])}), local Ollama LLM (qwen3-coder:30b-16k), Pydantic for data contracts, and static AST parsing.",
+            "4. What technologies does it use?": f"Python ({', '.join(langs[:3])}), local Ollama LLM (qwen3-coder:30b), Pydantic for data contracts, and static AST parsing.",
             "5. How is the repository organized?": "Separated into app/agents/ (specialized analyzers), app/orchestrator/ (pipeline coordinator), app/tools/ (safe filesystem and AST indexer), app/llm/ (Ollama wrapper), app/api/ (HTTP routes), and frontend/ (UI).",
             "6. Where does execution start?": "Execution starts in app/main.py, which parses CLI arguments, initializes the environment, and launches the HTTP server.",
             "7. What are the important entry points?": "app/main.py for CLI/Server execution; POST /api/analyze for HTTP analysis requests.",
@@ -179,7 +179,7 @@ class TeacherAgent(BaseAgent):
             "12. How does data flow through the system?": "Filesystem source code -> RepositoryScanner AST metadata -> Agent Prompts -> Ollama LLM -> Validated Pydantic Models -> JSON Artifacts -> Web UI.",
             "13. What databases/storage systems are used?": "Structured JSON artifact files in workspace/ containing machine-readable and human-readable state.",
             "14. What external services are used?": "Local Ollama daemon running at http://localhost:11434 with zero third-party cloud telemetry.",
-            "15. If AI is involved, where exactly does the AI/ML system fit?": "Local LLM (qwen3-coder:30b-16k) powers the reasoning of each agent, guided by domain-specific system prompts and Pydantic JSON schemas.",
+            "15. If AI is involved, where exactly does the AI/ML system fit?": "Local LLM (qwen3-coder:30b) powers the reasoning of each agent, guided by domain-specific system prompts and Pydantic JSON schemas.",
             "16. What are the most important classes/functions?": "Orchestrator.run_analysis(), RepositoryScanner.scan(), OllamaClient.generate_structured(), BaseAgent.run().",
             "17. What abstractions are being used?": "AnalysisContext (shared blackboard), BaseAgent (strategy pattern), SafeFilesystem (boundary guard), Pydantic Models (data contracts).",
             "18. What assumptions does the architecture make?": "Assumes repository is on local disk, Python 3.10+ is available, and Ollama is optionally accessible on localhost.",
@@ -301,7 +301,7 @@ class TeacherAgent(BaseAgent):
             "    Search[app/tools/code_search.py]\n"
             "  end\n"
             "  subgraph External_Storage [External Services & Storage]\n"
-            "    Ollama[Local Ollama (qwen3-coder:30b-16k)]\n"
+            "    Ollama[Local Ollama (qwen3-coder:30b)]\n"
             "    Disk[workspace/*.json Artifacts]\n"
             "  end\n"
             "  CLI --> API;\n"
