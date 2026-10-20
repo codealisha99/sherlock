@@ -1,7 +1,11 @@
 """Sherlock Configuration Module
 
-Central configuration for Ollama integration, static analysis parameters,
-and artifact storage.
+Central configuration for the model-free codebase intelligence engine,
+static analysis parameters, index storage, and optional Ollama integration.
+
+Sherlock operates entirely without an LLM by default. Ollama is an optional
+enhancement that is never initialized or required during normal startup,
+indexing, searching, or querying.
 """
 
 from pathlib import Path
@@ -13,12 +17,12 @@ from pydantic import BaseModel, Field
 class SherlockConfig(BaseModel):
     """Configuration settings for Sherlock."""
 
-    # Ollama settings
+    # Optional Ollama settings (never used during normal model-free operation)
     ollama_host: str = Field(
         default_factory=lambda: os.getenv("SHERLOCK_OLLAMA_HOST", "http://localhost:11434")
     )
     model_name: str = Field(
-        default_factory=lambda: os.getenv("SHERLOCK_MODEL", "qwen3-coder:30b-16k")
+        default_factory=lambda: os.getenv("SHERLOCK_MODEL", "qwen3-coder:30b")
     )
     timeout_seconds: int = Field(
         default_factory=lambda: int(os.getenv("SHERLOCK_TIMEOUT", "120"))
@@ -29,6 +33,20 @@ class SherlockConfig(BaseModel):
     max_file_size_bytes: int = Field(default=150_000)  # 150 KB
     max_files_to_index: int = Field(default=2500)
     max_tokens_per_prompt: int = Field(default=14_000)
+
+    # Conservative context-window budget (num_ctx) passed to Ollama only when
+    # the optional LLM integration is explicitly invoked. Does not assume the
+    # model tag's advertised context; keep this bounded to protect laptop
+    # memory/VRAM during local inference.
+    context_window: int = Field(
+        default=16_384,
+        description="Conservative context-window budget (num_ctx) passed to Ollama; does not assume the model tag's advertised context.",
+    )
+
+    # Index storage
+    index_db_path: Path = Field(
+        default_factory=lambda: Path(__file__).resolve().parent / "index" / "sherlock.db"
+    )
 
     # Ignored directories
     ignored_dirs: Set[str] = Field(

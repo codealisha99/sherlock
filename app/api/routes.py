@@ -16,6 +16,7 @@ from typing import Optional
 from config import config
 from app.orchestrator.orchestrator import Orchestrator
 from app.analysis.context import AnalysisContext
+from app.indexer import RepositoryIndexer
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
     """Multi-threaded HTTP handler for Sherlock API and Frontend."""
 
     orchestrator: Optional[Orchestrator] = None
+    indexer: Optional[RepositoryIndexer] = None
     frontend_dir: Path = Path(__file__).resolve().parent.parent.parent / "frontend"
 
     def _send_json(self, data: dict, status_code: int = 200):
@@ -56,6 +58,97 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/health":
             health = self.orchestrator.llm.check_health() if self.orchestrator else {"available": False}
             self._send_json({"status": "ok", "ollama": health})
+            return
+
+        # 1b. Model-free: list indexed repositories
+        if path == "/api/index/repos":
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            indexer.store.connect()
+            try:
+                repos = indexer.store.list_repositories()
+            finally:
+                indexer.store.close()
+            self._send_json({"repositories": repos, "count": len(repos)})
+            return
+
+        # 1c. Model-free: repository status/detail
+        if path.startswith("/api/index/repos/") and "/search" not in path and "/file" not in path:
+            repo_id = path.replace("/api/index/repos/", "").strip("/")
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            repo = indexer.get_repository(repo_id)
+            if not repo:
+                self._send_error_json("Repository not found", 404)
+                return
+            c = indexer.consistency_check(repo_id)
+            self._send_json({**repo, "consistency": c})
+            return
+
+        # 1d. Model-free: search indexed chunks
+        if path == "/api/index/search":
+            repo_id = query.get("repo_id", [None])[0]
+            query_term = query.get("query", [None])[0]
+            limit = int(query.get("limit", ["20"])[0])
+            if not repo_id or not query_term:
+                self._send_error_json("'repo_id' and 'query' are required", 400)
+                return
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            indexer.store.connect()
+            try:
+                results = indexer.store.search_chunks(repo_id, query_term, limit=limit)
+            finally:
+                indexer.store.close()
+            self._send_json({"results": results, "count": len(results)})
+            return
+
+        # 1e. Model-free: inspect a source file with line numbers
+        if path.startswith("/api/index/repos/") and path.endswith("/file"):
+            parts = path.strip("/").split("/")
+            # /api/index/repos/{id}/file
+            repo_id = parts[3]
+            file_rel_path = query.get("path", [""])[0]
+            start_line = int(query.get("start_line", ["1"])[0])
+            end_line = int(query.get("end_line", ["50"])[0])
+            if not file_rel_path:
+                self._send_error_json("Missing 'path' query parameter", 400)
+                return
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            indexer.store.connect()
+            try:
+                repo_row = indexer.store.get_repository(repo_id)
+                if repo_row is None:
+                    self._send_error_json("Repository not found", 404)
+                    return
+                file_row = None
+                for f in indexer.store.get_files_by_repo(repo_id):
+                    if f["path"] == file_rel_path:
+                        file_row = f
+                        break
+                if file_row is None:
+                    self._send_error_json(f"File not in index: {file_rel_path}", 404)
+                    return
+                root = Path(repo_row["path"])
+            finally:
+                indexer.store.close()
+            from app.tools.filesys import SafeFilesystem
+            fs = SafeFilesystem(root, config)
+            content, truncated = fs.read_file(file_rel_path, max_bytes=config.max_file_size_bytes)
+            lines = content.splitlines()
+            out = []
+            for i, line in enumerate(lines, start=start_line):
+                if end_line is not None and i > end_line:
+                    break
+                out.append({"line": i, "content": line})
+            self._send_json({
+                "path": file_rel_path,
+                "language": file_row["language"],
+                "line_count": file_row["line_count"],
+                "truncated": truncated,
+                "lines": out,
+            })
             return
 
         # 2. Get Analysis Status
@@ -197,6 +290,66 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                 "project_name": project_path.name,
                 "project_path": str(project_path),
             }, status_code=202)
+            return
+
+        # Model-free: start indexing a repository (no LLM)
+        if path == "/api/index":
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len).decode("utf-8")
+            try:
+                data = json.loads(raw_body)
+            except Exception:
+                self._send_error_json("Invalid JSON payload", 400)
+                return
+
+            project_path_str = data.get("project_path", "").strip()
+            if not project_path_str:
+                self._send_error_json("Missing 'project_path'", 400)
+                return
+
+            project_path = Path(project_path_str).resolve()
+            if not project_path.exists() or not project_path.is_dir():
+                self._send_error_json(f"Directory not found: {project_path_str}", 400)
+                return
+
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            repo_id = data.get("repo_id")
+            repo_name = data.get("repo_name")
+
+            def worker():
+                try:
+                    indexer.index_repository(project_path, repo_id=repo_id, repo_name=repo_name)
+                except Exception as e:
+                    logger.error(f"Background model-free indexing failed: {e}")
+
+            t = threading.Thread(target=worker, daemon=True)
+            t.start()
+
+            self._send_json({
+                "status": "started",
+                "project_name": project_path.name,
+                "project_path": str(project_path),
+                "note": "Indexing runs in the background. Poll GET /api/index/repos for status.",
+            }, status_code=202)
+            return
+
+        self._send_error_json("Endpoint not found", 404)
+
+    def do_DELETE(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        # Model-free: remove a repository and its derived index data
+        if path.startswith("/api/index/repos/"):
+            repo_id = path.replace("/api/index/repos/", "").strip("/")
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            removed = indexer.remove_repository(repo_id)
+            if removed:
+                self._send_json({"status": "removed", "repo_id": repo_id})
+            else:
+                self._send_error_json("Repository not found", 404)
             return
 
         self._send_error_json("Endpoint not found", 404)

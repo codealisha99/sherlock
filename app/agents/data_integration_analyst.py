@@ -114,14 +114,14 @@ class DataIntegrationAnalystAgent(BaseAgent):
                     "Request timeout on large codebases",
                     "Malformed JSON output / schema mismatch",
                 ],
-                configuration_required="SHERLOCK_OLLAMA_HOST (default: http://localhost:11434), SHERLOCK_MODEL (default: qwen3-coder:30b-16k)",
+                configuration_required="SHERLOCK_OLLAMA_HOST (default: http://localhost:11434), SHERLOCK_MODEL (default: qwen3-coder:30b)",
             )
         )
 
         ai_ml.append(
             AiMlComponentInfo(
                 name="Qwen 2.5/3 Coder LLM",
-                model_or_service="qwen3-coder:30b-16k (via local Ollama)",
+                model_or_service="qwen3-coder:30b (via local Ollama)",
                 role="Code reasoning, architecture abstraction, gap detection, and tutorial generation.",
                 entry_location="app/llm/ollama_client.py",
                 purpose="Acts as the reasoning engine for the 6 specialized Sherlock analysis agents.",
