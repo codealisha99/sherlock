@@ -58,6 +58,7 @@ class TestAPIHandler(unittest.TestCase):
         self.cfg = SherlockConfig()
         self.orchestrator = Orchestrator(sherlock_cfg=self.cfg)
         SherlockRequestHandler.orchestrator = self.orchestrator
+        SherlockRequestHandler.enable_ai = True
 
     def test_health_endpoint(self):
         status, _, body = simulate_http_request("GET", "/api/health")

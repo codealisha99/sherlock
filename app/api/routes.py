@@ -26,6 +26,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
 
     orchestrator: Optional[Orchestrator] = None
     indexer: Optional[RepositoryIndexer] = None
+    enable_ai: bool = False
     frontend_dir: Path = Path(__file__).resolve().parent.parent.parent / "frontend"
 
     def _send_json(self, data: dict, status_code: int = 200):
@@ -33,8 +34,9 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        # Restrict CORS to same-origin by default; do not reflect arbitrary origins.
+        self.send_header("Access-Control-Allow-Origin", "null")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
         self.wfile.write(body)
@@ -56,7 +58,10 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
 
         # 1. Health check
         if path == "/api/health":
-            health = self.orchestrator.llm.check_health() if self.orchestrator else {"available": False}
+            if self.enable_ai and self.orchestrator:
+                health = self.orchestrator.llm.check_health()
+            else:
+                health = {"available": False, "ai_enabled": False}
             self._send_json({"status": "ok", "ollama": health})
             return
 
@@ -83,6 +88,44 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                 return
             c = indexer.consistency_check(repo_id)
             self._send_json({**repo, "consistency": c})
+            return
+
+        # 1f. Model-free: symbol definitions with references
+        if path == "/api/index/symbols":
+            repo_id = query.get("repo_id", [None])[0]
+            symbol_name = query.get("symbol", [None])[0]
+            if not repo_id:
+                self._send_error_json("'repo_id' is required", 400)
+                return
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            indexer.store.connect()
+            try:
+                if symbol_name:
+                    refs = indexer.store.get_symbol_references(repo_id, symbol_name=symbol_name)
+                    self._send_json({"symbol": symbol_name, "references": refs, "count": len(refs)})
+                else:
+                    defs = indexer.store.get_symbol_definitions_with_references(repo_id)
+                    self._send_json({"symbols": defs, "count": len(defs)})
+            finally:
+                indexer.store.close()
+            return
+
+        # 1g. Model-free: symbol references lookup
+        if path == "/api/index/references":
+            repo_id = query.get("repo_id", [None])[0]
+            symbol_name = query.get("symbol", [None])[0]
+            if not repo_id or not symbol_name:
+                self._send_error_json("'repo_id' and 'symbol' are required", 400)
+                return
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            indexer.store.connect()
+            try:
+                refs = indexer.store.get_symbol_references(repo_id, symbol_name=symbol_name)
+            finally:
+                indexer.store.close()
+            self._send_json({"symbol": symbol_name, "references": refs, "count": len(refs)})
             return
 
         # 1d. Model-free: search indexed chunks
@@ -264,6 +307,15 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             project_path = Path(project_path_str).resolve()
             if not project_path.exists() or not project_path.is_dir():
                 self._send_error_json(f"Directory not found: {project_path_str}", 400)
+                return
+
+            # AI analysis requires explicit opt-in
+            if not self.enable_ai:
+                self._send_error_json(
+                    "AI analysis is disabled. Start Sherlock with --enable-ai to use Ollama-powered analysis, "
+                    "or use the model-free endpoints (/api/index/*) instead.",
+                    status_code=403,
+                )
                 return
 
             # Initialize orchestrator if needed

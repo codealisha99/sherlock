@@ -5,13 +5,14 @@ full-text search (FTS5) over code chunks. All operations are local and
 require no LLM, embedding model, or network service.
 
 Tables:
-  repositories   - registered repositories and indexing status
-  files          - scanned files with metadata and content hashes
-  chunks         - searchable code chunks with line ranges
-  chunk_fts      - FTS5 virtual table over chunk content
-  definitions    - extracted classes, functions, methods
-  imports        - extracted import statements
-  index_log      - audit log of indexing actions
+  repositories        - registered repositories and indexing status
+  files               - scanned files with metadata and content hashes
+  chunks              - searchable code chunks with line ranges
+  chunk_fts           - FTS5 virtual table over chunk content
+  definitions         - extracted classes, functions, methods
+  imports             - extracted import statements
+  symbol_references   - symbol usages/references with provenance and resolution status
+  index_log           - audit log of indexing actions
 """
 
 import hashlib
@@ -106,6 +107,23 @@ _SCHEMA = [
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS symbol_references (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        repo_id TEXT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+        file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        symbol_name TEXT NOT NULL,
+        symbol_kind TEXT NOT NULL,
+        line INTEGER NOT NULL,
+        column INTEGER,
+        resolution_status TEXT NOT NULL DEFAULT 'unresolved',
+        resolved_to_file_id TEXT,
+        resolved_to_line INTEGER,
+        evidence_type TEXT NOT NULL,
+        evidence_detail TEXT,
+        UNIQUE(repo_id, file_id, symbol_name, line)
+    )
+    """,
+    """
     CREATE INDEX IF NOT EXISTS idx_files_repo ON files(repo_id);
     CREATE INDEX IF NOT EXISTS idx_chunks_repo ON chunks(repo_id);
     CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_id);
@@ -114,6 +132,9 @@ _SCHEMA = [
     CREATE INDEX IF NOT EXISTS idx_imports_repo ON imports(repo_id);
     CREATE INDEX IF NOT EXISTS idx_imports_file ON imports(file_id);
     CREATE INDEX IF NOT EXISTS idx_index_log_repo ON index_log(repo_id);
+    CREATE INDEX IF NOT EXISTS idx_symbol_references_repo ON symbol_references(repo_id);
+    CREATE INDEX IF NOT EXISTS idx_symbol_references_symbol ON symbol_references(symbol_name);
+    CREATE INDEX IF NOT EXISTS idx_symbol_references_file ON symbol_references(file_id);
     """,
 ]
 
@@ -450,6 +471,139 @@ class IndexStore:
         return [dict(r) for r in rows]
 
     # ------------------------------------------------------------------ #
+    # Symbol references (provenance-tracked symbol usages)
+    # ------------------------------------------------------------------ #
+    def add_symbol_reference(
+        self,
+        repo_id: str,
+        file_id: str,
+        symbol_name: str,
+        symbol_kind: str,
+        line: int,
+        column: Optional[int] = None,
+        resolution_status: str = "unresolved",
+        resolved_to_file_id: Optional[str] = None,
+        resolved_to_line: Optional[int] = None,
+        evidence_type: str = "text_match",
+        evidence_detail: Optional[str] = None,
+    ) -> int:
+        """Record a symbol reference with provenance.
+
+        Returns the new row id. Uses INSERT OR IGNORE so re-indexing the
+        same file does not create duplicate reference rows.
+        """
+        conn = self.connect()
+        cur = conn.execute(
+            """
+            INSERT OR IGNORE INTO symbol_references
+            (repo_id, file_id, symbol_name, symbol_kind, line, column,
+             resolution_status, resolved_to_file_id, resolved_to_line,
+             evidence_type, evidence_detail)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                repo_id,
+                file_id,
+                symbol_name,
+                symbol_kind,
+                line,
+                column,
+                resolution_status,
+                resolved_to_file_id,
+                resolved_to_line,
+                evidence_type,
+                evidence_detail,
+            ),
+        )
+        conn.commit()
+        # If the row already existed (UNIQUE constraint), lastrowid may be 0;
+        # fetch the existing id instead.
+        row_id = cur.lastrowid
+        if row_id == 0:
+            existing = conn.execute(
+                """
+                SELECT id FROM symbol_references
+                WHERE repo_id = ? AND file_id = ? AND symbol_name = ? AND line = ?
+                """,
+                (repo_id, file_id, symbol_name, line),
+            ).fetchone()
+            row_id = existing["id"] if existing else 0
+        return int(row_id)
+
+    def get_symbol_references(
+        self,
+        repo_id: str,
+        symbol_name: Optional[str] = None,
+        file_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return symbol references for a repository.
+
+        Optionally filter by symbol name or file id. Each result includes
+        provenance fields so callers can trace back to source evidence.
+        """
+        conn = self.connect()
+        query = """
+            SELECT sr.*, f.path AS file_path
+            FROM symbol_references sr
+            JOIN files f ON f.id = sr.file_id
+            WHERE sr.repo_id = ?
+        """
+        params: List[Any] = [repo_id]
+        if symbol_name is not None:
+            query += " AND sr.symbol_name = ?"
+            params.append(symbol_name)
+        if file_id is not None:
+            query += " AND sr.file_id = ?"
+            params.append(file_id)
+        query += " ORDER BY sr.file_id, sr.line"
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_symbol_definitions_with_references(
+        self, repo_id: str
+    ) -> List[Dict[str, Any]]:
+        """Return definitions joined with their references.
+
+        Each definition row includes a ``references`` list of reference
+        dicts. References with resolution_status 'unresolved' are
+        explicitly marked so consumers know the relationship is inferred
+        or ambiguous rather than proven.
+        """
+        conn = self.connect()
+        defs = conn.execute(
+            """
+            SELECT d.*, f.path AS file_path
+            FROM definitions d
+            JOIN files f ON f.id = d.file_id
+            WHERE d.repo_id = ?
+            ORDER BY f.path, d.line
+            """,
+            (repo_id,),
+        ).fetchall()
+        result: List[Dict[str, Any]] = []
+        for d in defs:
+            d_dict = dict(d)
+            refs = conn.execute(
+                """
+                SELECT sr.*, f.path AS file_path
+                FROM symbol_references sr
+                JOIN files f ON f.id = sr.file_id
+                WHERE sr.repo_id = ? AND sr.symbol_name = ?
+                ORDER BY sr.file_id, sr.line
+                """,
+                (repo_id, d_dict["name"]),
+            ).fetchall()
+            d_dict["references"] = [dict(r) for r in refs]
+            result.append(d_dict)
+        return result
+
+    def delete_references_for_file(self, file_id: str) -> None:
+        """Delete all symbol references for a given file (idempotent re-indexing)."""
+        conn = self.connect()
+        conn.execute("DELETE FROM symbol_references WHERE file_id = ?", (file_id,))
+        conn.commit()
+
+    # ------------------------------------------------------------------ #
     # Index log
     # ------------------------------------------------------------------ #
     def log_action(self, repo_id: str, action: str, details: Optional[str] = None) -> None:
@@ -512,6 +666,66 @@ class IndexStore:
             "orphan_definitions": orphan_defs,
             "orphan_imports": orphan_imports,
             "consistent": orphan_chunks == 0 and orphan_defs == 0 and orphan_imports == 0,
+        }
+
+    # ------------------------------------------------------------------ #
+    # Storage inventory
+    # ------------------------------------------------------------------ #
+    def get_storage_inventory(self) -> Dict[str, Any]:
+        """Return a summary of what is persisted and where.
+
+        Used for documentation and security transparency: callers can
+        inspect exactly which tables exist, how many rows per repository,
+        and whether the database file is encrypted (it is not; protection
+        relies on OS disk encryption and filesystem permissions).
+        """
+        conn = self.connect()
+        tables = [
+            "repositories",
+            "files",
+            "chunks",
+            "chunk_fts",
+            "definitions",
+            "imports",
+            "symbol_references",
+            "index_log",
+        ]
+        table_info: Dict[str, Any] = {}
+        for table in tables:
+            try:
+                row = conn.execute(
+                    f"SELECT COUNT(*) AS c FROM {table}"
+                ).fetchone()
+                table_info[table] = row["c"] if row else 0
+            except Exception:
+                table_info[table] = "error"
+
+        repos = conn.execute("SELECT id, path, name, file_count FROM repositories").fetchall()
+        repo_list = [dict(r) for r in repos]
+
+        db_path = str(self.db_path)
+        db_exists = self.db_path.exists()
+        db_size_bytes = self.db_path.stat().st_size if db_exists else 0
+
+        return {
+            "database_path": db_path,
+            "database_exists": db_exists,
+            "database_size_bytes": db_size_bytes,
+            "database_encrypted": False,
+            "encryption_mechanism": None,
+            "protection_baseline": "OS disk encryption + filesystem permissions",
+            "tables": table_info,
+            "repositories": repo_list,
+            "stored_data_summary": {
+                "repositories": "metadata + indexing status",
+                "files": "path, language, size, line count, content hash",
+                "chunks": "60-line source snippets with start/end line ranges (raw source text)",
+                "chunk_fts": "FTS5 full-text index over chunk content",
+                "definitions": "symbol name, kind (function/class/method), line, signature",
+                "imports": "imported module, line, kind (import/from_import)",
+                "symbol_references": "symbol usage with provenance, resolution status, evidence",
+                "index_log": "indexing action audit trail",
+            },
         }
 
 
