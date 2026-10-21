@@ -1,13 +1,19 @@
 """Model-free repository indexer for Sherlock.
 
 Scans a target repository safely, parses Python source with the stdlib ``ast``
-module, and persists file metadata, searchable chunks, definitions, and imports
-into the SQLite index store. All operations are local, deterministic, and
-require no LLM, embedding model, or network service.
+module, and persists file metadata, searchable chunks, definitions, imports,
+and symbol references into the SQLite index store. All operations are local,
+deterministic, and require no LLM, embedding model, or network service.
+
+Symbol references are recorded with provenance (evidence type, resolution
+status) so that every structural result can be traced back to source evidence.
+Unresolved, ambiguous, dynamic, or inferred relationships are explicitly
+marked rather than presented as proven call graphs.
 """
 
 import ast
 import fnmatch
+import hashlib
 import logging
 import time
 import uuid
@@ -74,6 +80,7 @@ class RepositoryIndexer:
     def __init__(self, cfg: Optional[SherlockConfig] = None):
         self.cfg = cfg or config
         self.store = IndexStore(cfg=self.cfg)
+        self.gitignore_patterns: List[str] = []
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -101,6 +108,9 @@ class RepositoryIndexer:
         result = IndexResult(repo_id=repo_id, repo_path=str(root), repo_name=repo_name)
 
         fs = SafeFilesystem(root, self.cfg)
+
+        # Load .gitignore patterns for this repository
+        self.gitignore_patterns = self._load_gitignore(root)
 
         self.store.connect()
         try:
@@ -292,21 +302,62 @@ class RepositoryIndexer:
         # AST parsing for Python
         definitions: List[Tuple[str, str, int, Optional[str]]] = []
         imports: List[Tuple[str, int, str]] = []
+        call_refs: List[Tuple[str, int, Optional[int], str, Optional[str]]] = []
+        tree: Optional[ast.AST] = None
         if resolved.suffix.lower() == ".py":
             try:
                 tree = ast.parse(content)
                 definitions, imports = self._extract_python_symbols(tree, rel_path)
+                call_refs = self._extract_call_references(tree, rel_path)
             except SyntaxError:
-                # Malformed Python: still indexed as text, but no defs/imports
+                # Malformed Python: still indexed as text, but no defs/imports/calls
                 logger.debug("Syntax error in %s; skipping AST extraction", rel_path)
 
         for name, kind, line, signature in definitions:
             self.store.add_definition(repo_id, file_id, name, kind, line, signature)
+            self.store.add_symbol_reference(
+                repo_id=repo_id,
+                file_id=file_id,
+                symbol_name=name,
+                symbol_kind=kind,
+                line=line,
+                resolution_status="resolved",
+                resolved_to_file_id=file_id,
+                resolved_to_line=line,
+                evidence_type="ast_definition",
+                evidence_detail=signature or "",
+            )
             self.definition_count_increment(result)
 
         for module, line, kind in imports:
             self.store.add_import(repo_id, file_id, module, line, kind)
+            self.store.add_symbol_reference(
+                repo_id=repo_id,
+                file_id=file_id,
+                symbol_name=module,
+                symbol_kind=kind,
+                line=line,
+                resolution_status="unresolved",
+                evidence_type="ast_import",
+                evidence_detail=f"import {module}",
+            )
             self.import_count_increment(result)
+
+        # Call references: mark as unresolved/ambiguous/dynamic since static
+        # analysis cannot determine which definition a call resolves to
+        # without whole-program analysis.
+        for callee_name, line, column, evidence_type, evidence_detail in call_refs:
+            self.store.add_symbol_reference(
+                repo_id=repo_id,
+                file_id=file_id,
+                symbol_name=callee_name,
+                symbol_kind="call",
+                line=line,
+                column=column,
+                resolution_status="unresolved",
+                evidence_type=evidence_type,
+                evidence_detail=evidence_detail,
+            )
 
         result.file_count += 1
         result.total_lines += line_count
@@ -348,6 +399,55 @@ class RepositoryIndexer:
                 imports.append((module, node.lineno, "from_import"))
 
         return definitions, imports
+
+    def _extract_call_references(
+        self, tree: ast.AST, rel_path: str
+    ) -> List[Tuple[str, int, Optional[int], str, Optional[str]]]:
+        """Extract function call references from Python AST.
+
+        Returns a list of (callee_name, line, column, evidence_type, evidence_detail).
+        Call targets are marked 'unresolved' because static analysis cannot
+        determine which definition a call resolves to without whole-program
+        analysis. Dynamic calls (getattr, imported aliases) are marked
+        'dynamic' or 'ambiguous'.
+        """
+        references: List[Tuple[str, int, Optional[int], str, Optional[str]]] = []
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func = node.func
+                callee_name: Optional[str] = None
+                evidence_type = "ast_call"
+                evidence_detail: Optional[str] = None
+                resolution_status = "unresolved"
+
+                if isinstance(func, ast.Name):
+                    callee_name = func.id
+                    evidence_detail = f"{func.id}(...)"
+                elif isinstance(func, ast.Attribute):
+                    # method call like obj.method() or module.func()
+                    callee_name = func.attr
+                    try:
+                        obj_str = ast.unparse(func.value)
+                        evidence_detail = f"{obj_str}.{func.attr}(...)"
+                    except Exception:
+                        evidence_detail = f".{func.attr}(...)"
+                    resolution_status = "ambiguous"  # can't statically know the receiver type
+                else:
+                    # Dynamic call (e.g., getattr(), funcptr(), imported alias)
+                    try:
+                        evidence_detail = ast.unparse(func)
+                    except Exception:
+                        evidence_detail = "<dynamic call>"
+                    callee_name = "<dynamic>"
+                    resolution_status = "dynamic"
+
+                if callee_name:
+                    references.append(
+                        (callee_name, node.lineno, node.col_offset, evidence_type, evidence_detail)
+                    )
+
+        return references
 
     # ------------------------------------------------------------------ #
     # Stale record cleanup
@@ -408,6 +508,24 @@ class RepositoryIndexer:
         # Skip VCS internals explicitly
         if ".git" in parts:
             return True
+        # Skip .gitignore itself
+        if p.name == ".gitignore":
+            return True
+        # Check gitignore patterns
+        rel_path = str(p.relative_to(root)) if p.is_relative_to(root) else str(p)
+        for pat in self.gitignore_patterns:
+            # Directory-only pattern (trailing slash): match against path components
+            if pat.endswith("/"):
+                dir_pat = pat[:-1]
+                path_parts = rel_path.split("/")
+                if dir_pat in path_parts:
+                    return True
+                if rel_path == dir_pat or rel_path.startswith(dir_pat + "/"):
+                    return True
+                continue
+            # Regular pattern: match against filename or relative path
+            if fnmatch.fnmatch(p.name, pat) or fnmatch.fnmatch(rel_path, pat):
+                return True
         return False
 
     @staticmethod
@@ -416,6 +534,26 @@ class RepositoryIndexer:
             return str(p.relative_to(root))
         except ValueError:
             return str(p)
+
+    @staticmethod
+    def _load_gitignore(root: Path) -> List[str]:
+        """Load .gitignore patterns from the repository root.
+
+        Returns patterns as-is (trailing slashes preserved for directory-only
+        patterns). Directory-only patterns are matched against path components.
+        """
+        patterns: List[str] = []
+        gitignore_path = root / ".gitignore"
+        if gitignore_path.is_file():
+            try:
+                with open(gitignore_path, "r", encoding="utf-8", errors="replace") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#"):
+                            patterns.append(line)
+            except Exception:
+                pass
+        return patterns
 
 
 def _utc_now() -> str:

@@ -202,6 +202,70 @@ def cmd_imports(args) -> int:
     return 0
 
 
+def cmd_symbols(args) -> int:
+    """List symbol definitions with their references (no LLM)."""
+    indexer = _get_indexer()
+    indexer.store.connect()
+    try:
+        if args.file:
+            file_id = None
+            for f in indexer.store.get_files_by_repo(args.repo_id):
+                if f["path"] == args.file:
+                    file_id = f["id"]
+                    break
+            if file_id is None:
+                print(f"[!] File not in index: {args.file}", file=sys.stderr)
+                return 1
+            defs = indexer.store.get_definitions_by_file(file_id)
+            # Enrich with references for each definition
+            enriched = []
+            for d in defs:
+                d_dict = dict(d)
+                refs = indexer.store.get_symbol_references(
+                    args.repo_id, symbol_name=d_dict["name"]
+                )
+                d_dict["references"] = refs
+                enriched.append(d_dict)
+            defs = enriched
+        else:
+            defs = indexer.store.get_symbol_definitions_with_references(args.repo_id)
+    finally:
+        indexer.store.close()
+    if not defs:
+        print("No symbol definitions found.")
+        return 0
+    print(f"Symbol definitions ({len(defs)}):")
+    for d in defs:
+        sig = f" {d['signature']}" if d.get("signature") else ""
+        refs = d.get("references", [])
+        ref_count = len(refs)
+        unresolved = sum(1 for r in refs if r.get("resolution_status") == "unresolved")
+        print(f"  {d['line']:4d}  {d['kind']:12s} {d['name']}{sig}  refs={ref_count} unresolved={unresolved}")
+    return 0
+
+
+def cmd_references(args) -> int:
+    """List symbol references for a given symbol name (no LLM)."""
+    indexer = _get_indexer()
+    indexer.store.connect()
+    try:
+        refs = indexer.store.get_symbol_references(
+            args.repo_id, symbol_name=args.symbol
+        )
+    finally:
+        indexer.store.close()
+    if not refs:
+        print(f"No references found for symbol '{args.symbol}'.")
+        return 0
+    print(f"References to '{args.symbol}' ({len(refs)}):")
+    for r in refs:
+        status = r.get("resolution_status", "unknown")
+        evidence = r.get("evidence_type", "unknown")
+        detail = (r.get("evidence_detail") or "")[:80]
+        print(f"  {r['file_path']}:{r['line']}  [{status}] [{evidence}]  {detail}")
+    return 0
+
+
 def cmd_list(args) -> int:
     indexer = _get_indexer()
     indexer.store.connect()
@@ -323,22 +387,36 @@ def _run_ollama_analyze(project_dir: str):
     return 0
 
 
-def run_server(host: str, port: int, auto_open: bool = False):
-    """Run the multi-threaded HTTP web server (Ollama-powered API)."""
+def run_server(host: str, port: int, auto_open: bool = False, enable_ai: bool = False):
+    """Run the multi-threaded HTTP web server.
+
+    By default (enable_ai=False), Ollama is never imported or contacted.
+    The model-free /api/index/* endpoints work without any AI provider.
+    Set enable_ai=True to enable the optional Ollama-powered /api/analyze path.
+    """
     import webbrowser
     from http.server import ThreadingHTTPServer
 
     from app.api.routes import SherlockRequestHandler
-    from app.orchestrator.orchestrator import Orchestrator
 
-    orchestrator = Orchestrator()
+    # Only initialize the Ollama-powered orchestrator when AI is explicitly enabled.
+    if enable_ai:
+        from app.orchestrator.orchestrator import Orchestrator
+
+        orchestrator = Orchestrator()
+    else:
+        orchestrator = None
     SherlockRequestHandler.orchestrator = orchestrator
+    SherlockRequestHandler.enable_ai = enable_ai
 
     server_address = (host, port)
     httpd = ThreadingHTTPServer(server_address, SherlockRequestHandler)
 
     url = f"http://{host}:{port}" if host != "0.0.0.0" else f"http://localhost:{port}"
     print(f"[*] Sherlock Codebase Explorer running at: {url}")
+    if not enable_ai:
+        print("[*] AI integration disabled. Core indexing/search works without Ollama.")
+        print("[*] Use --enable-ai to enable optional Ollama-powered analysis.")
     print("[*] Press Ctrl+C to stop the server.\n")
 
     if auto_open:
@@ -392,6 +470,16 @@ def main():
     p_imports.add_argument("--file", help="Optional file path to scope imports")
     p_imports.set_defaults(func=cmd_imports)
 
+    p_symbols = sub.add_parser("symbols", help="List symbol definitions with references (no LLM)")
+    p_symbols.add_argument("--repo-id", required=True, help="Repository id")
+    p_symbols.add_argument("--file", help="Optional file path to scope symbols")
+    p_symbols.set_defaults(func=cmd_symbols)
+
+    p_refs = sub.add_parser("references", help="List references to a symbol (no LLM)")
+    p_refs.add_argument("--repo-id", required=True, help="Repository id")
+    p_refs.add_argument("--symbol", required=True, help="Symbol name to look up")
+    p_refs.set_defaults(func=cmd_references)
+
     p_list = sub.add_parser("list", help="List indexed repositories (no LLM)")
     p_list.set_defaults(func=cmd_list)
 
@@ -410,9 +498,14 @@ def main():
     # --- Existing Ollama-powered flags (backward compatible) ---
     parser.add_argument("--analyze", "-a", type=str, help="Path to local repository to analyze via Ollama multi-agent pipeline")
     parser.add_argument("--serve", "-s", action="store_true", default=True, help="Start the web server (default)")
-    parser.add_argument("--host", type=str, default="0.0.0.0", help="Server host (default: 0.0.0.0)")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Server host (default: 127.0.0.1, loopback only)")
     parser.add_argument("--port", "-p", type=int, default=8080, help="Server port (default: 8080)")
     parser.add_argument("--open", action="store_true", help="Automatically open browser on server start")
+    parser.add_argument(
+        "--enable-ai",
+        action="store_true",
+        help="Enable optional Ollama AI integration (disabled by default; core functions work without AI)",
+    )
 
     args = parser.parse_args()
 
@@ -422,7 +515,7 @@ def main():
     if args.analyze:
         return _run_ollama_analyze(args.analyze)
 
-    run_server(args.host, args.port, auto_open=args.open)
+    run_server(args.host, args.port, auto_open=args.open, enable_ai=args.enable_ai)
     return 0
 
 
