@@ -16,6 +16,7 @@ sys.path.insert(0, ".")
 
 from app.indexer import RepositoryIndexer  # noqa: E402
 from app.main import cmd_embed, cmd_semantic_search  # noqa: E402
+from config import config  # noqa: E402
 
 
 class _Args:
@@ -39,9 +40,14 @@ class TestCliEmbedCommands(unittest.TestCase):
     """Tests for the embed and semantic-search CLI commands."""
 
     def setUp(self):
-        # Use the default indexer (matches existing test conventions).
-        # CLI commands create their own indexer via _get_indexer(), which
-        # uses the global config's index_db_path.
+        # Redirect the global config's index_db_path to a temporary database
+        # so CLI commands (which use _get_indexer() -> config.index_db_path)
+        # never write to index/sherlock.db.
+        self.test_dir = Path(tempfile.mkdtemp(prefix="sherlock_cli_db_test_"))
+        self.db_path = self.test_dir / "index" / "sherlock.db"
+        self._orig_index_db_path = config.index_db_path
+        config.index_db_path = self.db_path
+
         self.indexer = RepositoryIndexer()
         self.root = _make_repo(
             {
@@ -58,6 +64,9 @@ class TestCliEmbedCommands(unittest.TestCase):
         except Exception:
             pass
         shutil.rmtree(self.root, ignore_errors=True)
+        # Restore the original config and remove the temp database.
+        config.index_db_path = self._orig_index_db_path
+        shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_embed_command_success(self):
         """The embed command reports embedded chunks."""
