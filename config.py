@@ -43,6 +43,25 @@ class SherlockConfig(BaseModel):
         description="Conservative context-window budget (num_ctx) passed to Ollama; does not assume the model tag's advertised context.",
     )
 
+    # Embedding model configuration (separate from Ollama generation model).
+    # Used for local semantic embedding generation via sentence-transformers.
+    embedding_model_name: str = Field(
+        default_factory=lambda: os.getenv("SHERLOCK_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
+        description="Sentence-Transformers model used for local code embeddings.",
+    )
+    embedding_dimension: int = Field(
+        default_factory=lambda: int(os.getenv("SHERLOCK_EMBEDDING_DIM", "384")),
+        description="Expected vector dimension for the configured embedding model.",
+    )
+    embedding_batch_size: int = Field(
+        default_factory=lambda: int(os.getenv("SHERLOCK_EMBEDDING_BATCH_SIZE", "32")),
+        description="Batch size for sentence-transformers encoding.",
+    )
+    embedding_device: str = Field(
+        default_factory=lambda: os.getenv("SHERLOCK_EMBEDDING_DEVICE", "cpu"),
+        description="Device for sentence-transformers inference (cpu, cuda, mps).",
+    )
+
     # Index storage
     index_db_path: Path = Field(
         default_factory=lambda: Path(__file__).resolve().parent / "index" / "sherlock.db"

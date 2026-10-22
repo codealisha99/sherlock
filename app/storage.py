@@ -9,6 +9,7 @@ Tables:
   files               - scanned files with metadata and content hashes
   chunks              - searchable code chunks with line ranges
   chunk_fts           - FTS5 virtual table over chunk content
+  chunk_embeddings    - sqlite-vec virtual table over chunk embedding vectors
   definitions         - extracted classes, functions, methods
   imports             - extracted import statements
   symbol_references   - symbol usages/references with provenance and resolution status
@@ -17,6 +18,7 @@ Tables:
 
 import hashlib
 import logging
+import math
 import os
 import sqlite3
 from pathlib import Path
@@ -27,6 +29,15 @@ from config import config, SherlockConfig
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 1
+
+# Optional sqlite-vec import; vector storage is unavailable without it.
+try:
+    import sqlite_vec
+
+    _SQLITE_VEC_AVAILABLE = True
+except ImportError:  # pragma: no cover - depends on environment
+    sqlite_vec = None  # type: ignore[assignment]
+    _SQLITE_VEC_AVAILABLE = False
 
 _SCHEMA = [
     """
@@ -156,6 +167,7 @@ class IndexStore:
             self._conn.execute("PRAGMA synchronous=NORMAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
             self._init_schema()
+            self._init_vec_schema()
         return self._conn
 
     def _init_schema(self) -> None:
@@ -164,6 +176,32 @@ class IndexStore:
             conn.executescript(statement)
         conn.commit()
         logger.info("Index schema initialized at %s", self.db_path)
+
+    def _init_vec_schema(self) -> None:
+        """Create the sqlite-vec virtual table for chunk embeddings.
+
+        Uses ``CREATE VIRTUAL TABLE IF NOT EXISTS`` so re-initialization on
+        an existing database is safe. Vectors are stored L2-normalized so
+        that L2 distance ranking is equivalent to cosine similarity ranking.
+        """
+        if not _SQLITE_VEC_AVAILABLE:
+            logger.debug("sqlite-vec not available; skipping vector schema init")
+            return
+        conn = self.connect()
+        conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+        dimension = int(self.cfg.embedding_dimension)
+        conn.execute(
+            f"""
+            CREATE VIRTUAL TABLE IF NOT EXISTS chunk_embeddings USING vec0(
+                embedding float[{dimension}]
+            )
+            """
+        )
+        conn.commit()
+        logger.info(
+            "Vector schema initialized at %s (dimension=%d)", self.db_path, dimension
+        )
 
     def close(self) -> None:
         if self._conn is not None:
@@ -248,8 +286,25 @@ class IndexStore:
         conn.commit()
 
     def remove_repository(self, repo_id: str) -> bool:
-        """Delete a repository and all derived index data (cascades)."""
+        """Delete a repository and all derived index data (cascades).
+
+        Because sqlite-vec virtual tables do not support foreign keys or
+        cascading deletes, chunk embeddings for this repository are removed
+        explicitly before the repository row is deleted.
+        """
         conn = self.connect()
+        # Remove embeddings for this repo's chunks first (vec0 has no FK
+        # cascade support).
+        if _SQLITE_VEC_AVAILABLE:
+            conn.execute(
+                """
+                DELETE FROM chunk_embeddings
+                WHERE rowid IN (
+                    SELECT c.id FROM chunks c WHERE c.repo_id = ?
+                )
+                """,
+                (repo_id,),
+            )
         cur = conn.execute("DELETE FROM repositories WHERE id = ?", (repo_id,))
         conn.commit()
         removed = cur.rowcount > 0
@@ -348,6 +403,12 @@ class IndexStore:
         ).fetchall()
         for r in rows:
             conn.execute("DELETE FROM chunk_fts WHERE rowid = ?", (r["id"],))
+            # vec0 has no FK cascade support; remove embeddings explicitly.
+            if _SQLITE_VEC_AVAILABLE:
+                conn.execute(
+                    "DELETE FROM chunk_embeddings WHERE rowid = ?",
+                    (r["id"],),
+                )
         conn.execute("DELETE FROM chunks WHERE file_id = ?", (file_id,))
         conn.commit()
 
@@ -378,6 +439,195 @@ class IndexStore:
             (fts_query, repo_id, limit),
         ).fetchall()
         return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------ #
+    # Vector storage (sqlite-vec)
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _normalize_vector(embedding: List[float]) -> List[float]:
+        """L2-normalize a vector so that L2 distance ranking equals cosine
+        similarity ranking. Returns a new list."""
+        norm = math.sqrt(sum(v * v for v in embedding))
+        if norm == 0.0:
+            return list(embedding)
+        return [v / norm for v in embedding]
+
+    @staticmethod
+    def _validate_embedding(embedding: List[float], dimension: int) -> List[float]:
+        """Validate that an embedding is nonempty, one-dimensional, finite,
+        and matches the expected dimension. Returns a normalized copy."""
+        if not isinstance(embedding, list) or len(embedding) == 0:
+            raise ValueError("Embedding must be a nonempty list of floats.")
+        if len(embedding) != dimension:
+            raise ValueError(
+                f"Embedding dimension mismatch: expected {dimension}, got {len(embedding)}."
+            )
+        if not all(math.isfinite(v) for v in embedding):
+            raise ValueError("Embedding contains non-finite values.")
+        return IndexStore._normalize_vector(embedding)
+
+    def upsert_chunk_embedding(
+        self,
+        chunk_id: int,
+        embedding: List[float],
+    ) -> None:
+        """Insert or replace a chunk embedding vector.
+
+        sqlite-vec virtual tables do not support ``ON CONFLICT`` or foreign
+        keys, so an existing row with the same ``rowid`` is deleted first,
+        then the new vector is inserted. The embedding is L2-normalized
+        before storage so that L2 distance ranking is equivalent to cosine
+        similarity ranking.
+        """
+        if not _SQLITE_VEC_AVAILABLE:
+            raise RuntimeError("sqlite-vec is not available; vector storage is disabled.")
+        dimension = int(self.cfg.embedding_dimension)
+        normalized = self._validate_embedding(embedding, dimension)
+        conn = self.connect()
+        # Delete any existing row for this chunk_id (no ON CONFLICT on vec0).
+        conn.execute("DELETE FROM chunk_embeddings WHERE rowid = ?", (chunk_id,))
+        conn.execute(
+            "INSERT INTO chunk_embeddings(rowid, embedding) VALUES (?, ?)",
+            (chunk_id, sqlite_vec.serialize_float32(normalized)),
+        )
+        conn.commit()
+
+    def get_chunk_embedding(self, chunk_id: int) -> Optional[List[float]]:
+        """Retrieve the stored embedding vector for a chunk, if any."""
+        if not _SQLITE_VEC_AVAILABLE:
+            return None
+        conn = self.connect()
+        row = conn.execute(
+            "SELECT embedding FROM chunk_embeddings WHERE rowid = ?",
+            (chunk_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        import numpy as np
+
+        return np.frombuffer(row["embedding"], dtype=np.float32).tolist()
+
+    def delete_chunk_embedding(self, chunk_id: int) -> None:
+        """Delete the embedding vector for a chunk, if present."""
+        if not _SQLITE_VEC_AVAILABLE:
+            return
+        conn = self.connect()
+        conn.execute("DELETE FROM chunk_embeddings WHERE rowid = ?", (chunk_id,))
+        conn.commit()
+
+    def sync_chunk_embeddings(self, repo_id: str) -> Dict[str, int]:
+        """Synchronize the ``chunk_embeddings`` table with the ``chunks`` table.
+
+        Inserts missing embeddings (as zero vectors placeholder) and removes
+        embeddings for chunks that no longer exist. Returns a summary of
+        actions taken. Callers should replace placeholder vectors with real
+        embeddings via :meth:`upsert_chunk_embedding`.
+
+        This is useful after re-indexing when chunks may have changed.
+        """
+        if not _SQLITE_VEC_AVAILABLE:
+            return {"inserted": 0, "deleted": 0}
+        dimension = int(self.cfg.embedding_dimension)
+        conn = self.connect()
+        # Chunk IDs that exist in the chunks table but not in vec0.
+        missing = conn.execute(
+            """
+            SELECT c.id FROM chunks c
+            LEFT JOIN chunk_embeddings e ON e.rowid = c.id
+            WHERE c.repo_id = ? AND e.rowid IS NULL
+            """,
+            (repo_id,),
+        ).fetchall()
+        # Embedding rows whose chunk no longer exists.
+        orphaned = conn.execute(
+            """
+            SELECT e.rowid FROM chunk_embeddings e
+            LEFT JOIN chunks c ON c.id = e.rowid
+            WHERE c.id IS NULL
+            """,
+        ).fetchall()
+        inserted = 0
+        zero_vec = [0.0] * dimension
+        for r in missing:
+            conn.execute(
+                "INSERT INTO chunk_embeddings(rowid, embedding) VALUES (?, ?)",
+                (r["id"], sqlite_vec.serialize_float32(zero_vec)),
+            )
+            inserted += 1
+        deleted = 0
+        for r in orphaned:
+            conn.execute("DELETE FROM chunk_embeddings WHERE rowid = ?", (r["rowid"],))
+            deleted += 1
+        conn.commit()
+        return {"inserted": inserted, "deleted": deleted}
+
+    def search_chunk_embeddings(
+        self,
+        repo_id: str,
+        query_embedding: List[float],
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """Nearest-neighbor search over chunk embeddings using cosine similarity.
+
+        The query embedding is L2-normalized before search. Stored vectors are
+        also L2-normalized, so L2 distance ranking is equivalent to cosine
+        similarity ranking. Distance is converted to a similarity score via
+        ``similarity = 1 - distance^2 / 2`` (valid for unit vectors).
+
+        Returns a list of dicts with chunk metadata and a ``similarity`` key.
+        """
+        if not _SQLITE_VEC_AVAILABLE:
+            raise RuntimeError("sqlite-vec is not available; vector search is disabled.")
+        dimension = int(self.cfg.embedding_dimension)
+        normalized = self._validate_embedding(query_embedding, dimension)
+        conn = self.connect()
+        rows = conn.execute(
+            """
+            SELECT c.id, c.file_id, c.content, c.start_line, c.end_line,
+                   c.chunk_type, f.path AS file_path,
+                   e.distance
+            FROM chunk_embeddings e
+            JOIN chunks c ON c.id = e.rowid
+            JOIN files f ON f.id = c.file_id
+            WHERE e.embedding MATCH ? AND k = ? AND c.repo_id = ?
+            ORDER BY e.distance
+            """,
+            (sqlite_vec.serialize_float32(normalized), limit, repo_id),
+        ).fetchall()
+        results: List[Dict[str, Any]] = []
+        for r in rows:
+            distance = float(r["distance"])
+            # For unit vectors: cosine_similarity = 1 - distance^2 / 2
+            similarity = max(0.0, min(1.0, 1.0 - (distance * distance) / 2.0))
+            results.append(
+                {
+                    "id": r["id"],
+                    "file_id": r["file_id"],
+                    "content": r["content"],
+                    "start_line": r["start_line"],
+                    "end_line": r["end_line"],
+                    "chunk_type": r["chunk_type"],
+                    "file_path": r["file_path"],
+                    "distance": distance,
+                    "similarity": similarity,
+                }
+            )
+        return results
+
+    def get_chunk_embedding_count(self, repo_id: str) -> int:
+        """Return the number of embedding vectors for a repository."""
+        if not _SQLITE_VEC_AVAILABLE:
+            return 0
+        conn = self.connect()
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS c FROM chunk_embeddings e
+            JOIN chunks c ON c.id = e.rowid
+            WHERE c.repo_id = ?
+            """,
+            (repo_id,),
+        ).fetchone()
+        return int(row["c"]) if row else 0
 
     # ------------------------------------------------------------------ #
     # Definitions & imports
@@ -685,6 +935,7 @@ class IndexStore:
             "files",
             "chunks",
             "chunk_fts",
+            "chunk_embeddings",
             "definitions",
             "imports",
             "symbol_references",
