@@ -312,6 +312,78 @@ def cmd_remove(args) -> int:
     return 1
 
 
+def cmd_embed(args) -> int:
+    """Generate and persist embeddings for all chunks of a repository."""
+    from app.llm.embedding_client import EmbeddingClient
+
+    indexer = _get_indexer()
+    client = EmbeddingClient()
+    if not client.is_available():
+        print(
+            "[!] Embedding model is not available. Ensure sentence-transformers "
+            "and the configured model are installed.",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        result = indexer.embed_chunks(args.repo_id, embedding_client=client)
+    except ValueError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except RuntimeError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    print(f"[+] Embedded chunks for repository {args.repo_id}")
+    print(f"    chunks       : {result['chunk_count']}")
+    print(f"    embedded     : {result['embedded_count']}")
+    print(f"    skipped      : {result['skipped_count']}")
+    print(f"    duration     : {result['duration_seconds']}s")
+    if result["errors"]:
+        print(f"    errors       : {len(result['errors'])}")
+        for e in result["errors"][:10]:
+            print(f"                 - {e}")
+    return 0
+
+
+def cmd_semantic_search(args) -> int:
+    """Search indexed code chunks by semantic similarity (no LLM)."""
+    from app.llm.embedding_client import EmbeddingClient
+
+    indexer = _get_indexer()
+    client = EmbeddingClient()
+    if not client.is_available():
+        print(
+            "[!] Embedding model is not available. Ensure sentence-transformers "
+            "and the configured model are installed.",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        results = indexer.semantic_search(
+            args.repo_id, args.query, limit=args.limit, embedding_client=client
+        )
+    except ValueError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except RuntimeError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    if not results:
+        print(f"No semantic results for '{args.query}' in repository {args.repo_id}.")
+        return 0
+    print(f"Semantic search results for '{args.query}' ({len(results)}):")
+    for r in results:
+        print(
+            f"  {r['file_path']}:{r['start_line']}-{r['end_line']} "
+            f"(similarity={r.get('similarity', 0.0):.4f}, "
+            f"distance={r.get('distance', 0.0):.4f})"
+        )
+        snippet = (r.get("content") or "").strip().splitlines()[0] if r.get("content") else ""
+        if snippet:
+            print(f"    {snippet[:100]}")
+    return 0
+
+
 def cmd_summary(args) -> int:
     """Print a deterministic, evidence-based summary of the indexed repository."""
     indexer = _get_indexer()
@@ -490,6 +562,16 @@ def main():
     p_remove = sub.add_parser("remove", help="Remove a repository and its derived index data (no LLM)")
     p_remove.add_argument("--repo-id", required=True, help="Repository id")
     p_remove.set_defaults(func=cmd_remove)
+
+    p_embed = sub.add_parser("embed", help="Generate and persist embeddings for a repository's chunks")
+    p_embed.add_argument("--repo-id", required=True, help="Repository id")
+    p_embed.set_defaults(func=cmd_embed)
+
+    p_semantic = sub.add_parser("semantic-search", help="Search indexed chunks by semantic similarity (no LLM)")
+    p_semantic.add_argument("--repo-id", required=True, help="Repository id")
+    p_semantic.add_argument("--query", required=True, help="Natural-language query")
+    p_semantic.add_argument("--limit", type=int, default=20, help="Max results")
+    p_semantic.set_defaults(func=cmd_semantic_search)
 
     p_summary = sub.add_parser("summary", help="Deterministic repository summary (no LLM)")
     p_summary.add_argument("--repo-id", required=True, help="Repository id")

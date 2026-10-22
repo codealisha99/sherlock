@@ -15,12 +15,14 @@ import ast
 import fnmatch
 import hashlib
 import logging
+import math
 import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.llm.embedding_client import EmbeddingClient
 from app.storage import IndexStore
 from app.tools.filesys import SafeFilesystem
 from config import config, SherlockConfig
@@ -90,22 +92,55 @@ class RepositoryIndexer:
         repo_path: str | Path,
         repo_id: Optional[str] = None,
         repo_name: Optional[str] = None,
+        subdirectory: Optional[str | Path] = None,
+        root_path: Optional[str | Path] = None,
     ) -> IndexResult:
         """Index a repository end-to-end.
 
         Re-indexing is idempotent: existing files are replaced when their
         content hash changes, and stale records are removed.
+
+        Parameters
+        ----------
+        repo_path:
+            Path stored in the database as the repository location. This is
+            what gets stored in the ``repositories.path`` column and must be
+            unique per repository.
+        repo_id:
+            Optional repository id. Generated if omitted.
+        repo_name:
+            Optional repository name. Defaults to the root directory name.
+        subdirectory:
+            Optional subdirectory within ``repo_path`` to index. Only files
+            under this subdirectory are indexed, but paths are reported
+            relative to ``root_path`` (the parent directory). This allows
+            indexing a single repository within a fixtures directory while
+            keeping paths relative to the fixtures root.
+        root_path:
+            Optional root directory for scanning and computing relative
+            paths. If not provided, defaults to ``repo_path``. Use this when
+            ``repo_path`` points to a subdirectory but you want paths
+            reported relative to a parent directory.
         """
-        root = Path(repo_path).resolve()
+        root = Path(root_path or repo_path).resolve()
         if not root.exists():
             raise ValueError(f"Repository path does not exist: {root}")
         if not root.is_dir():
             raise ValueError(f"Repository path is not a directory: {root}")
 
+        # Validate subdirectory is within root, if specified
+        subdir_path: Optional[Path] = None
+        if subdirectory is not None:
+            subdir_path = (root / subdirectory).resolve()
+            if not subdir_path.exists():
+                raise ValueError(f"Subdirectory does not exist: {subdir_path}")
+            if not subdir_path.is_dir():
+                raise ValueError(f"Subdirectory path is not a directory: {subdir_path}")
+
         repo_id = repo_id or str(uuid.uuid4())
         repo_name = repo_name or root.name
 
-        result = IndexResult(repo_id=repo_id, repo_path=str(root), repo_name=repo_name)
+        result = IndexResult(repo_id=repo_id, repo_path=str(repo_path), repo_name=repo_name)
 
         fs = SafeFilesystem(root, self.cfg)
 
@@ -116,13 +151,13 @@ class RepositoryIndexer:
         try:
             # Reuse the existing repository id for this path (re-index is
             # idempotent) so all derived tables stay consistent.
-            actual_repo_id = self.store.register_repository(repo_id, str(root), repo_name)
+            actual_repo_id = self.store.register_repository(repo_id, str(repo_path), repo_name)
             if actual_repo_id != repo_id:
                 repo_id = actual_repo_id
             # Keep the result's repo_id in sync with the id actually used in
             # the database (re-indexing an existing path reuses its row id).
             result.repo_id = repo_id
-            self.store.log_action(repo_id, "index_start", f"path={root}")
+            self.store.log_action(repo_id, "index_start", f"path={repo_path}")
 
             start = time.monotonic()
 
@@ -132,10 +167,20 @@ class RepositoryIndexer:
                 for p in root.rglob("*"):
                     if self._should_skip(p, root):
                         continue
+                    # Only include files under the subdirectory, if specified
+                    if subdirectory is not None:
+                        try:
+                            p.relative_to(subdir_path)
+                        except ValueError:
+                            continue
                     if p.is_file():
                         rel = self._relative(root, p)
                         on_disk[rel] = p
             except Exception as exc:  # pragma: no cover - defensive
+                result.status = "failed"
+                result.error = f"Failed to traverse repository: {exc}"
+                self._finalize(result, start)
+                return result
                 result.status = "failed"
                 result.error = f"Failed to traverse repository: {exc}"
                 self._finalize(result, start)
@@ -206,6 +251,174 @@ class RepositoryIndexer:
         self.store.connect()
         try:
             return self.store.consistency_check(repo_id)
+        finally:
+            self.store.close()
+
+    # ------------------------------------------------------------------ #
+    # Chunk embedding
+    # ------------------------------------------------------------------ #
+    def embed_chunks(
+        self,
+        repo_id: str,
+        embedding_client: Optional[EmbeddingClient] = None,
+    ) -> Dict[str, Any]:
+        """Generate and persist embeddings for all chunks of a repository.
+
+        This is an explicitly invoked operation, separate from
+        :meth:`index_repository`. It reuses the existing chunk records and
+        persists L2-normalized embedding vectors via the storage layer.
+
+        The embedding model is loaded once and reused for all chunks (via
+        the supplied or default :class:`EmbeddingClient`), avoiding repeated
+        loads.
+
+        Parameters
+        ----------
+        repo_id:
+            Repository id whose chunks should be embedded.
+        embedding_client:
+            Optional pre-configured :class:`EmbeddingClient`. If omitted, a
+            default client using the global config is created.
+
+        Returns
+        -------
+        dict
+            Summary with ``repo_id``, ``chunk_count``, ``embedded_count``,
+            ``skipped_count``, ``errors`` and ``duration_seconds``.
+
+        Raises
+        ------
+        ValueError
+            If the repository does not exist.
+        RuntimeError
+            If the embedding client or sqlite-vec is unavailable.
+        """
+        client = embedding_client or EmbeddingClient()
+        if not client.is_available():
+            raise RuntimeError(
+                "Embedding model is not available. Ensure sentence-transformers "
+                "and the configured model are installed."
+            )
+
+        self.store.connect()
+        try:
+            repo = self.store.get_repository(repo_id)
+            if repo is None:
+                raise ValueError(f"Repository not found: {repo_id}")
+
+            chunks = self.store.connect().execute(
+                """
+                SELECT c.id, c.content FROM chunks c
+                WHERE c.repo_id = ?
+                ORDER BY c.id
+                """,
+                (repo_id,),
+            ).fetchall()
+
+            chunk_ids = [r["id"] for r in chunks]
+            contents = [r["content"] for r in chunks]
+
+            embedded_count = 0
+            skipped_count = 0
+            errors: List[str] = []
+            start = time.monotonic()
+
+            if contents:
+                # Batch-embed all chunks at once for efficiency.
+                vectors = client.embed_texts(contents)
+                for chunk_id, vector in zip(chunk_ids, vectors):
+                    try:
+                        self.store.upsert_chunk_embedding(chunk_id, vector)
+                        embedded_count += 1
+                    except Exception as exc:  # noqa: BLE001 - report per-chunk
+                        skipped_count += 1
+                        errors.append(f"chunk {chunk_id}: {exc}")
+                        logger.warning("Failed to embed chunk %d: %s", chunk_id, exc)
+
+            duration = time.monotonic() - start
+            self.store.log_action(
+                repo_id,
+                "embed_chunks",
+                f"chunks={len(chunks)} embedded={embedded_count} skipped={skipped_count}",
+            )
+            return {
+                "repo_id": repo_id,
+                "chunk_count": len(chunks),
+                "embedded_count": embedded_count,
+                "skipped_count": skipped_count,
+                "errors": errors,
+                "duration_seconds": round(duration, 3),
+            }
+        finally:
+            self.store.close()
+
+    def semantic_search(
+        self,
+        repo_id: str,
+        query: str,
+        limit: int = 20,
+        embedding_client: Optional[EmbeddingClient] = None,
+    ) -> List[Dict[str, Any]]:
+        """Semantic search over indexed chunks using embedding similarity.
+
+        Embeds the query once, then searches only the vector index
+        (``chunk_embeddings``). Does not fall back to FTS5.
+
+        Parameters
+        ----------
+        repo_id:
+            Repository id to search within.
+        query:
+            Natural-language query string. Must be nonempty.
+        limit:
+            Maximum number of results to return.
+        embedding_client:
+            Optional pre-configured :class:`EmbeddingClient`. If omitted, a
+            default client using the global config is created.
+
+        Returns
+        -------
+        list of dict
+            Each dict contains chunk metadata (id, file_id, content,
+            start_line, end_line, chunk_type, file_path) plus ``distance``
+            and ``similarity`` keys. Results are ranked by similarity
+            (highest first).
+
+        Raises
+        ------
+        ValueError
+            If the query is empty or the repository does not exist.
+        RuntimeError
+            If the embedding model or sqlite-vec is unavailable, or no
+            embeddings exist for the repository.
+        """
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("semantic_search() requires a nonempty query string.")
+
+        client = embedding_client or EmbeddingClient()
+        if not client.is_available():
+            raise RuntimeError(
+                "Embedding model is not available. Ensure sentence-transformers "
+                "and the configured model are installed."
+            )
+
+        self.store.connect()
+        try:
+            repo = self.store.get_repository(repo_id)
+            if repo is None:
+                raise ValueError(f"Repository not found: {repo_id}")
+
+            if self.store.get_chunk_embedding_count(repo_id) == 0:
+                raise RuntimeError(
+                    f"No embeddings found for repository {repo_id}. "
+                    "Run 'embed' first to generate chunk embeddings."
+                )
+
+            query_embedding = client.embed_text(query)
+            results = self.store.search_chunk_embeddings(
+                repo_id, query_embedding, limit=limit
+            )
+            return results
         finally:
             self.store.close()
 

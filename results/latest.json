@@ -1,0 +1,2301 @@
+{
+  "dataset_version": "0.1.0",
+  "benchmark_timestamp": "2026-10-22T12:18:38.889161+00:00",
+  "num_queries": 35,
+  "aggregate_metrics": {
+    "recall@1": 0.5809523809523809,
+    "precision@1": 0.7142857142857143,
+    "ndcg@1": 0.7142857142857143,
+    "recall@5": 0.8857142857142857,
+    "precision@5": 0.23428571428571432,
+    "ndcg@5": 0.8224451006122498,
+    "recall@10": 0.8857142857142857,
+    "precision@10": 0.11714285714285716,
+    "ndcg@10": 0.8224451006122498,
+    "mrr": 0.8,
+    "average_precision": 0.8,
+    "num_retrieved": 1.9714285714285715,
+    "num_relevant": 1.2285714285714286,
+    "num_relevant_retrieved": 1.1714285714285715,
+    "num_queries": 35.0
+  },
+  "category_metrics": {
+    "exact_identifier": {
+      "recall@1": 0.5,
+      "precision@1": 0.6,
+      "ndcg@1": 0.6,
+      "recall@5": 1.0,
+      "precision@5": 0.24000000000000005,
+      "ndcg@5": 0.8523719014285831,
+      "recall@10": 1.0,
+      "precision@10": 0.12000000000000002,
+      "ndcg@10": 0.8523719014285831,
+      "mrr": 0.8,
+      "average_precision": 0.8,
+      "num_retrieved": 1.6,
+      "num_relevant": 1.2,
+      "num_relevant_retrieved": 1.2,
+      "num_queries": 5
+    },
+    "partial_identifier": {
+      "recall@1": 0.3333333333333333,
+      "precision@1": 0.3333333333333333,
+      "ndcg@1": 0.3333333333333333,
+      "recall@5": 0.6666666666666666,
+      "precision@5": 0.13333333333333333,
+      "ndcg@5": 0.5436432511904858,
+      "recall@10": 0.6666666666666666,
+      "precision@10": 0.06666666666666667,
+      "ndcg@10": 0.5436432511904858,
+      "mrr": 0.5,
+      "average_precision": 0.5,
+      "num_retrieved": 1.3333333333333333,
+      "num_relevant": 1.3333333333333333,
+      "num_relevant_retrieved": 0.6666666666666666,
+      "num_queries": 3
+    },
+    "function_discovery": {
+      "recall@1": 0.8333333333333334,
+      "precision@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "precision@5": 0.26666666666666666,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "precision@10": 0.13333333333333333,
+      "ndcg@10": 1.0,
+      "mrr": 1.0,
+      "average_precision": 1.0,
+      "num_retrieved": 1.3333333333333333,
+      "num_relevant": 1.3333333333333333,
+      "num_relevant_retrieved": 1.3333333333333333,
+      "num_queries": 3
+    },
+    "class_discovery": {
+      "recall@1": 1.0,
+      "precision@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "precision@5": 0.2,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "precision@10": 0.1,
+      "ndcg@10": 1.0,
+      "mrr": 1.0,
+      "average_precision": 1.0,
+      "num_retrieved": 1.0,
+      "num_relevant": 1.0,
+      "num_relevant_retrieved": 1.0,
+      "num_queries": 1
+    },
+    "import_discovery": {
+      "recall@1": 0.6666666666666666,
+      "precision@1": 0.6666666666666666,
+      "ndcg@1": 0.6666666666666666,
+      "recall@5": 1.0,
+      "precision@5": 0.20000000000000004,
+      "ndcg@5": 0.8769765845238192,
+      "recall@10": 1.0,
+      "precision@10": 0.10000000000000002,
+      "ndcg@10": 0.8769765845238192,
+      "mrr": 0.8333333333333334,
+      "average_precision": 0.8333333333333334,
+      "num_retrieved": 3.0,
+      "num_relevant": 1.0,
+      "num_relevant_retrieved": 1.0,
+      "num_queries": 3
+    },
+    "cross_file": {
+      "recall@1": 0.5,
+      "precision@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "precision@5": 0.4000000000000001,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "precision@10": 0.20000000000000004,
+      "ndcg@10": 1.0,
+      "mrr": 1.0,
+      "average_precision": 1.0,
+      "num_retrieved": 2.0,
+      "num_relevant": 2.0,
+      "num_relevant_retrieved": 2.0,
+      "num_queries": 3
+    },
+    "natural_language": {
+      "recall@1": 0.625,
+      "precision@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 1.0,
+      "precision@5": 0.25,
+      "ndcg@5": 0.9077324383928644,
+      "recall@10": 1.0,
+      "precision@10": 0.125,
+      "ndcg@10": 0.9077324383928644,
+      "mrr": 0.875,
+      "average_precision": 0.875,
+      "num_retrieved": 3.25,
+      "num_relevant": 1.25,
+      "num_relevant_retrieved": 1.25,
+      "num_queries": 4
+    },
+    "synonym": {
+      "recall@1": 0.5,
+      "precision@1": 0.6666666666666666,
+      "ndcg@1": 0.6666666666666666,
+      "recall@5": 1.0,
+      "precision@5": 0.26666666666666666,
+      "ndcg@5": 0.8769765845238192,
+      "recall@10": 1.0,
+      "precision@10": 0.13333333333333333,
+      "ndcg@10": 0.8769765845238192,
+      "mrr": 0.8333333333333334,
+      "average_precision": 0.8333333333333334,
+      "num_retrieved": 3.0,
+      "num_relevant": 1.3333333333333333,
+      "num_relevant_retrieved": 1.3333333333333333,
+      "num_queries": 3
+    },
+    "config_discovery": {
+      "recall@1": 1.0,
+      "precision@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "precision@5": 0.2,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "precision@10": 0.1,
+      "ndcg@10": 1.0,
+      "mrr": 1.0,
+      "average_precision": 1.0,
+      "num_retrieved": 1.0,
+      "num_relevant": 1.0,
+      "num_relevant_retrieved": 1.0,
+      "num_queries": 2
+    },
+    "error_handling": {
+      "recall@1": 0.75,
+      "precision@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "precision@5": 0.30000000000000004,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "precision@10": 0.15000000000000002,
+      "ndcg@10": 1.0,
+      "mrr": 1.0,
+      "average_precision": 1.0,
+      "num_retrieved": 2.5,
+      "num_relevant": 1.5,
+      "num_relevant_retrieved": 1.5,
+      "num_queries": 2
+    },
+    "no_result": {
+      "recall@1": 0.0,
+      "precision@1": 0.0,
+      "ndcg@1": 0.0,
+      "recall@5": 0.0,
+      "precision@5": 0.0,
+      "ndcg@5": 0.0,
+      "recall@10": 0.0,
+      "precision@10": 0.0,
+      "ndcg@10": 0.0,
+      "mrr": 0.0,
+      "average_precision": 0.0,
+      "num_retrieved": 0.0,
+      "num_relevant": 0.0,
+      "num_relevant_retrieved": 0.0,
+      "num_queries": 3
+    },
+    "ambiguous": {
+      "recall@1": 0.7777777777777778,
+      "precision@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "precision@5": 0.3333333333333333,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "precision@10": 0.16666666666666666,
+      "ndcg@10": 1.0,
+      "mrr": 1.0,
+      "average_precision": 1.0,
+      "num_retrieved": 2.6666666666666665,
+      "num_relevant": 1.6666666666666667,
+      "num_relevant_retrieved": 1.6666666666666667,
+      "num_queries": 3
+    }
+  },
+  "failures": [
+    {
+      "query_id": "q006",
+      "query": "calc",
+      "category": "partial_identifier",
+      "failure_category": "no_relevant_retrieved",
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [],
+      "retrieved_files": [],
+      "metrics": {
+        "recall@1": 0.0,
+        "precision@1": 0.0,
+        "ndcg@1": 0.0,
+        "recall@5": 0.0,
+        "precision@5": 0.0,
+        "ndcg@5": 0.0,
+        "recall@10": 0.0,
+        "precision@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "average_precision": 0.0,
+        "num_retrieved": 0.0,
+        "num_relevant": 2.0,
+        "num_relevant_retrieved": 0.0
+      },
+      "search_error": null
+    }
+  ],
+  "query_results": [
+    {
+      "query_id": "q001",
+      "query": "Calculator",
+      "category": "exact_identifier",
+      "repo": "calc",
+      "should_have_results": true,
+      "expected_files": [
+        "calc/calculator.py"
+      ],
+      "expected_symbols": [
+        "Calculator"
+      ],
+      "retrieved_files": [
+        "calc/calculator.py"
+      ],
+      "num_retrieved": 1,
+      "search_duration_seconds": 0.0005,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 1.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 1,
+          "file_id": "eval_calc:calc/calculator.py",
+          "content": "\"\"\"Calculator module with basic arithmetic operations.\"\"\"\n\n\nclass Calculator:\n    \"\"\"A simple calculator supporting basic arithmetic.\"\"\"\n\n    def add(self, a, b):\n        \"\"\"Return the sum of a and b.\"\"\"\n        return a + b\n\n    def subtract(self, a, b):\n        \"\"\"Return the difference of a and b.\"\"\"\n        return a - b\n\n    def multiply(self, a, b):\n        \"\"\"Return the product of a and b.\"\"\"\n        return a * b\n\n    def divide(self, a, b):\n        \"\"\"Return the quotient of a and b.\"\"\"\n        if b == 0:\n            raise ValueError(\"Cannot divide by zero\")\n        return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/calculator.py",
+          "rank": -1.5290780141843974e-06
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q002",
+      "query": "add",
+      "category": "exact_identifier",
+      "repo": "calc",
+      "should_have_results": true,
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [
+        "add"
+      ],
+      "retrieved_files": [
+        "calc/operations.py",
+        "calc/calculator.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0005,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.5,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.4,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.2,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 2.0,
+        "num_relevant": 2.0,
+        "num_relevant_retrieved": 2.0
+      },
+      "raw_results": [
+        {
+          "id": 2,
+          "file_id": "eval_calc:calc/operations.py",
+          "content": "\"\"\"Standalone mathematical operations.\"\"\"\n\n\ndef add(a, b):\n    \"\"\"Return the sum of two numbers.\"\"\"\n    return a + b\n\n\ndef subtract(a, b):\n    \"\"\"Return the difference of two numbers.\"\"\"\n    return a - b\n\n\ndef multiply(a, b):\n    \"\"\"Return the product of two numbers.\"\"\"\n    return a * b\n\n\ndef divide(a, b):\n    \"\"\"Return the quotient of two numbers.\"\"\"\n    if b == 0:\n        raise ValueError(\"Cannot divide by zero\")\n    return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/operations.py",
+          "rank": -1.0558276199804115e-06
+        },
+        {
+          "id": 1,
+          "file_id": "eval_calc:calc/calculator.py",
+          "content": "\"\"\"Calculator module with basic arithmetic operations.\"\"\"\n\n\nclass Calculator:\n    \"\"\"A simple calculator supporting basic arithmetic.\"\"\"\n\n    def add(self, a, b):\n        \"\"\"Return the sum of a and b.\"\"\"\n        return a + b\n\n    def subtract(self, a, b):\n        \"\"\"Return the difference of a and b.\"\"\"\n        return a - b\n\n    def multiply(self, a, b):\n        \"\"\"Return the product of a and b.\"\"\"\n        return a * b\n\n    def divide(self, a, b):\n        \"\"\"Return the quotient of a and b.\"\"\"\n        if b == 0:\n            raise ValueError(\"Cannot divide by zero\")\n        return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/calculator.py",
+          "rank": -9.497797356828195e-07
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q003",
+      "query": "read_csv",
+      "category": "exact_identifier",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [
+        "read_csv"
+      ],
+      "retrieved_files": [
+        "dataproc/pipeline.py",
+        "dataproc/reader.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0006,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.0,
+        "precision@1": 0.0,
+        "ndcg@1": 0.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 0.6309297535714575,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "average_precision": 0.5,
+        "num_retrieved": 2.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -0.7066707512693134
+        },
+        {
+          "id": 4,
+          "file_id": "eval_dataproc:dataproc/reader.py",
+          "content": "\"\"\"File readers for the data processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef read_csv(path):\n    \"\"\"Read a CSV file and return rows as dictionaries.\"\"\"\n    with open(path, newline=\"\") as f:\n        reader = csv.DictReader(f)\n        return list(reader)\n\n\ndef read_json(path):\n    \"\"\"Read a JSON file and return the parsed object.\"\"\"\n    with open(path, \"r\") as f:\n        return json.load(f)\n\n\ndef read_text(path):\n    \"\"\"Read a text file and return its contents as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/reader.py",
+          "rank": -0.6094673205747382
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q004",
+      "query": "slugify",
+      "category": "exact_identifier",
+      "repo": "utils",
+      "should_have_results": true,
+      "expected_files": [
+        "utils/string_utils.py"
+      ],
+      "expected_symbols": [
+        "slugify"
+      ],
+      "retrieved_files": [
+        "utils/string_utils.py"
+      ],
+      "num_retrieved": 1,
+      "search_duration_seconds": 0.0005,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 1.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 9,
+          "file_id": "eval_utils:utils/string_utils.py",
+          "content": "\"\"\"String manipulation utilities.\"\"\"\n\n\ndef slugify(text):\n    \"\"\"Convert a string to a URL-friendly slug.\"\"\"\n    return text.lower().strip().replace(\" \", \"-\")\n\n\ndef capitalize_words(text):\n    \"\"\"Capitalize the first letter of each word.\"\"\"\n    return \" \".join(word.capitalize() for word in text.split())\n\n\ndef truncate(text, max_length):\n    \"\"\"Truncate a string to the specified maximum length.\"\"\"\n    if len(text) <= max_length:\n        return text\n    return text[:max_length] + \"...\"",
+          "start_line": 1,
+          "end_line": 18,
+          "chunk_type": "code",
+          "file_path": "utils/string_utils.py",
+          "rank": -1.9442957637976925
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q005",
+      "query": "write_json",
+      "category": "exact_identifier",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/writer.py"
+      ],
+      "expected_symbols": [
+        "write_json"
+      ],
+      "retrieved_files": [
+        "dataproc/pipeline.py",
+        "dataproc/writer.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.0,
+        "precision@1": 0.0,
+        "ndcg@1": 0.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 0.6309297535714575,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "average_precision": 0.5,
+        "num_retrieved": 2.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -1.28485568504524
+        },
+        {
+          "id": 6,
+          "file_id": "eval_dataproc:dataproc/writer.py",
+          "content": "\"\"\"Data writers for the processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef write_csv(path, rows, fieldnames=None):\n    \"\"\"Write rows to a CSV file.\"\"\"\n    if fieldnames is None and rows:\n        fieldnames = list(rows[0].keys())\n    with open(path, \"w\", newline=\"\") as f:\n        writer = csv.DictWriter(f, fieldnames=fieldnames)\n        writer.writeheader()\n        writer.writerows(rows)\n\n\ndef write_json(path, data):\n    \"\"\"Write data to a JSON file.\"\"\"\n    with open(path, \"w\") as f:\n        json.dump(data, f, indent=2)\n\n\ndef write_text(path, content):\n    \"\"\"Write text content to a file.\"\"\"\n    with open(path, \"w\") as f:\n        f.write(content)",
+          "start_line": 1,
+          "end_line": 27,
+          "chunk_type": "code",
+          "file_path": "dataproc/writer.py",
+          "rank": -1.051143302459067
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q006",
+      "query": "calc",
+      "category": "partial_identifier",
+      "repo": "calc",
+      "should_have_results": true,
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [],
+      "retrieved_files": [],
+      "num_retrieved": 0,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.0,
+        "precision@1": 0.0,
+        "ndcg@1": 0.0,
+        "recall@5": 0.0,
+        "precision@5": 0.0,
+        "ndcg@5": 0.0,
+        "recall@10": 0.0,
+        "precision@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "average_precision": 0.0,
+        "num_retrieved": 0.0,
+        "num_relevant": 2.0,
+        "num_relevant_retrieved": 0.0
+      },
+      "raw_results": [],
+      "failure_category": "no_relevant_retrieved"
+    },
+    {
+      "query_id": "q007",
+      "query": "transform",
+      "category": "partial_identifier",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/transformer.py"
+      ],
+      "expected_symbols": [
+        "transform_data"
+      ],
+      "retrieved_files": [
+        "dataproc/pipeline.py",
+        "dataproc/transformer.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.0,
+        "precision@1": 0.0,
+        "ndcg@1": 0.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 0.6309297535714575,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "average_precision": 0.5,
+        "num_retrieved": 2.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -1.28485568504524
+        },
+        {
+          "id": 5,
+          "file_id": "eval_dataproc:dataproc/transformer.py",
+          "content": "\"\"\"Data transformers for the processing pipeline.\"\"\"\n\n\ndef transform_data(rows):\n    \"\"\"Apply a series of transformations to data rows.\"\"\"\n    cleaned = clean_data(rows)\n    normalized = normalize_values(cleaned)\n    return normalized\n\n\ndef clean_data(rows):\n    \"\"\"Remove empty rows and trim whitespace from string values.\"\"\"\n    cleaned = []\n    for row in rows:\n        if not row:\n            continue\n        cleaned_row = {k: v.strip() if isinstance(v, str) else v for k, v in row.items()}\n        cleaned.append(cleaned_row)\n    return cleaned\n\n\ndef normalize_values(rows):\n    \"\"\"Normalize numeric values to a 0-1 range.\"\"\"\n    return rows",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/transformer.py",
+          "rank": -1.0910765181472581
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q008",
+      "query": "reader",
+      "category": "partial_identifier",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [
+        "read_csv",
+        "read_json",
+        "read_text"
+      ],
+      "retrieved_files": [
+        "dataproc/reader.py",
+        "dataproc/pipeline.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0005,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 2.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 4,
+          "file_id": "eval_dataproc:dataproc/reader.py",
+          "content": "\"\"\"File readers for the data processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef read_csv(path):\n    \"\"\"Read a CSV file and return rows as dictionaries.\"\"\"\n    with open(path, newline=\"\") as f:\n        reader = csv.DictReader(f)\n        return list(reader)\n\n\ndef read_json(path):\n    \"\"\"Read a JSON file and return the parsed object.\"\"\"\n    with open(path, \"r\") as f:\n        return json.load(f)\n\n\ndef read_text(path):\n    \"\"\"Read a text file and return its contents as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/reader.py",
+          "rank": -1.5183562184904773
+        },
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -0.8750055089584738
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q009",
+      "query": "def add",
+      "category": "function_discovery",
+      "repo": "calc",
+      "should_have_results": true,
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [
+        "add"
+      ],
+      "retrieved_files": [
+        "calc/operations.py",
+        "calc/calculator.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.5,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.4,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.2,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 2.0,
+        "num_relevant": 2.0,
+        "num_relevant_retrieved": 2.0
+      },
+      "raw_results": [
+        {
+          "id": 2,
+          "file_id": "eval_calc:calc/operations.py",
+          "content": "\"\"\"Standalone mathematical operations.\"\"\"\n\n\ndef add(a, b):\n    \"\"\"Return the sum of two numbers.\"\"\"\n    return a + b\n\n\ndef subtract(a, b):\n    \"\"\"Return the difference of two numbers.\"\"\"\n    return a - b\n\n\ndef multiply(a, b):\n    \"\"\"Return the product of two numbers.\"\"\"\n    return a * b\n\n\ndef divide(a, b):\n    \"\"\"Return the quotient of two numbers.\"\"\"\n    if b == 0:\n        raise ValueError(\"Cannot divide by zero\")\n    return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/operations.py",
+          "rank": -1.2248597509103305
+        },
+        {
+          "id": 1,
+          "file_id": "eval_calc:calc/calculator.py",
+          "content": "\"\"\"Calculator module with basic arithmetic operations.\"\"\"\n\n\nclass Calculator:\n    \"\"\"A simple calculator supporting basic arithmetic.\"\"\"\n\n    def add(self, a, b):\n        \"\"\"Return the sum of a and b.\"\"\"\n        return a + b\n\n    def subtract(self, a, b):\n        \"\"\"Return the difference of a and b.\"\"\"\n        return a - b\n\n    def multiply(self, a, b):\n        \"\"\"Return the product of a and b.\"\"\"\n        return a * b\n\n    def divide(self, a, b):\n        \"\"\"Return the quotient of a and b.\"\"\"\n        if b == 0:\n            raise ValueError(\"Cannot divide by zero\")\n        return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/calculator.py",
+          "rank": -1.112204663513969
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q010",
+      "query": "class Calculator",
+      "category": "class_discovery",
+      "repo": "calc",
+      "should_have_results": true,
+      "expected_files": [
+        "calc/calculator.py"
+      ],
+      "expected_symbols": [
+        "Calculator"
+      ],
+      "retrieved_files": [
+        "calc/calculator.py"
+      ],
+      "num_retrieved": 1,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 1.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 1,
+          "file_id": "eval_calc:calc/calculator.py",
+          "content": "\"\"\"Calculator module with basic arithmetic operations.\"\"\"\n\n\nclass Calculator:\n    \"\"\"A simple calculator supporting basic arithmetic.\"\"\"\n\n    def add(self, a, b):\n        \"\"\"Return the sum of a and b.\"\"\"\n        return a + b\n\n    def subtract(self, a, b):\n        \"\"\"Return the difference of a and b.\"\"\"\n        return a - b\n\n    def multiply(self, a, b):\n        \"\"\"Return the product of a and b.\"\"\"\n        return a * b\n\n    def divide(self, a, b):\n        \"\"\"Return the quotient of a and b.\"\"\"\n        if b == 0:\n            raise ValueError(\"Cannot divide by zero\")\n        return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/calculator.py",
+          "rank": -4.499420602374687
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q011",
+      "query": "create_app",
+      "category": "function_discovery",
+      "repo": "webapp",
+      "should_have_results": true,
+      "expected_files": [
+        "webapp/app.py"
+      ],
+      "expected_symbols": [
+        "create_app"
+      ],
+      "retrieved_files": [
+        "webapp/app.py"
+      ],
+      "num_retrieved": 1,
+      "search_duration_seconds": 0.0005,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 1.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 10,
+          "file_id": "eval_webapp:webapp/app.py",
+          "content": "\"\"\"Web application entry point.\"\"\"\n\nfrom .routes import register_routes\nfrom .database import init_db\n\n\ndef create_app():\n    \"\"\"Create and configure the Flask application.\"\"\"\n    app = __import__(\"flask\").Flask(__name__)\n    app.config[\"DATABASE_URL\"] = \"sqlite:///app.db\"\n    app.config[\"SECRET_KEY\"] = \"dev-secret-key\"\n    register_routes(app)\n    init_db()\n    return app",
+          "start_line": 1,
+          "end_line": 14,
+          "chunk_type": "code",
+          "file_path": "webapp/app.py",
+          "rank": -2.5304050120940005
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q012",
+      "query": "run_pipeline",
+      "category": "function_discovery",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/pipeline.py"
+      ],
+      "expected_symbols": [
+        "run_pipeline"
+      ],
+      "retrieved_files": [
+        "dataproc/pipeline.py"
+      ],
+      "num_retrieved": 1,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 1.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -1.6415810486091174
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q013",
+      "query": "import csv",
+      "category": "import_discovery",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [],
+      "retrieved_files": [
+        "dataproc/pipeline.py",
+        "dataproc/reader.py",
+        "dataproc/writer.py"
+      ],
+      "num_retrieved": 3,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.0,
+        "precision@1": 0.0,
+        "ndcg@1": 0.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 0.6309297535714575,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "average_precision": 0.5,
+        "num_retrieved": 3.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -1.964696144577382
+        },
+        {
+          "id": 4,
+          "file_id": "eval_dataproc:dataproc/reader.py",
+          "content": "\"\"\"File readers for the data processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef read_csv(path):\n    \"\"\"Read a CSV file and return rows as dictionaries.\"\"\"\n    with open(path, newline=\"\") as f:\n        reader = csv.DictReader(f)\n        return list(reader)\n\n\ndef read_json(path):\n    \"\"\"Read a JSON file and return the parsed object.\"\"\"\n    with open(path, \"r\") as f:\n        return json.load(f)\n\n\ndef read_text(path):\n    \"\"\"Read a text file and return its contents as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/reader.py",
+          "rank": -1.8479742001534725
+        },
+        {
+          "id": 6,
+          "file_id": "eval_dataproc:dataproc/writer.py",
+          "content": "\"\"\"Data writers for the processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef write_csv(path, rows, fieldnames=None):\n    \"\"\"Write rows to a CSV file.\"\"\"\n    if fieldnames is None and rows:\n        fieldnames = list(rows[0].keys())\n    with open(path, \"w\", newline=\"\") as f:\n        writer = csv.DictWriter(f, fieldnames=fieldnames)\n        writer.writeheader()\n        writer.writerows(rows)\n\n\ndef write_json(path, data):\n    \"\"\"Write data to a JSON file.\"\"\"\n    with open(path, \"w\") as f:\n        json.dump(data, f, indent=2)\n\n\ndef write_text(path, content):\n    \"\"\"Write text content to a file.\"\"\"\n    with open(path, \"w\") as f:\n        f.write(content)",
+          "start_line": 1,
+          "end_line": 27,
+          "chunk_type": "code",
+          "file_path": "dataproc/writer.py",
+          "rank": -1.8058647128896266
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q014",
+      "query": "from .reader",
+      "category": "import_discovery",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/pipeline.py"
+      ],
+      "expected_symbols": [],
+      "retrieved_files": [
+        "dataproc/pipeline.py",
+        "dataproc/reader.py",
+        "dataproc/transformer.py"
+      ],
+      "num_retrieved": 3,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 3.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -2.3829195559866103
+        },
+        {
+          "id": 4,
+          "file_id": "eval_dataproc:dataproc/reader.py",
+          "content": "\"\"\"File readers for the data processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef read_csv(path):\n    \"\"\"Read a CSV file and return rows as dictionaries.\"\"\"\n    with open(path, newline=\"\") as f:\n        reader = csv.DictReader(f)\n        return list(reader)\n\n\ndef read_json(path):\n    \"\"\"Read a JSON file and return the parsed object.\"\"\"\n    with open(path, \"r\") as f:\n        return json.load(f)\n\n\ndef read_text(path):\n    \"\"\"Read a text file and return its contents as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/reader.py",
+          "rank": -2.0778322121327015
+        },
+        {
+          "id": 5,
+          "file_id": "eval_dataproc:dataproc/transformer.py",
+          "content": "\"\"\"Data transformers for the processing pipeline.\"\"\"\n\n\ndef transform_data(rows):\n    \"\"\"Apply a series of transformations to data rows.\"\"\"\n    cleaned = clean_data(rows)\n    normalized = normalize_values(cleaned)\n    return normalized\n\n\ndef clean_data(rows):\n    \"\"\"Remove empty rows and trim whitespace from string values.\"\"\"\n    cleaned = []\n    for row in rows:\n        if not row:\n            continue\n        cleaned_row = {k: v.strip() if isinstance(v, str) else v for k, v in row.items()}\n        cleaned.append(cleaned_row)\n    return cleaned\n\n\ndef normalize_values(rows):\n    \"\"\"Normalize numeric values to a 0-1 range.\"\"\"\n    return rows",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/transformer.py",
+          "rank": -0.7258243185100627
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q015",
+      "query": "import sqlite3",
+      "category": "import_discovery",
+      "repo": "webapp",
+      "should_have_results": true,
+      "expected_files": [
+        "webapp/database.py"
+      ],
+      "expected_symbols": [],
+      "retrieved_files": [
+        "webapp/database.py",
+        "webapp/app.py",
+        "webapp/routes.py"
+      ],
+      "num_retrieved": 3,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 3.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 11,
+          "file_id": "eval_webapp:webapp/database.py",
+          "content": "\"\"\"Database connection and session management.\"\"\"\n\n\nimport sqlite3\n\n\ndef init_db():\n    \"\"\"Initialize the database and create tables.\"\"\"\n    conn = sqlite3.connect(\"app.db\")\n    cursor = conn.cursor()\n    cursor.execute(\n        \"CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)\"\n    )\n    cursor.execute(\n        \"CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT, content TEXT, author_id INTEGER)\"\n    )\n    conn.commit()\n    conn.close()\n\n\ndef get_connection():\n    \"\"\"Return a new database connection.\"\"\"\n    return sqlite3.connect(\"app.db\")",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "webapp/database.py",
+          "rank": -3.377811217846476
+        },
+        {
+          "id": 10,
+          "file_id": "eval_webapp:webapp/app.py",
+          "content": "\"\"\"Web application entry point.\"\"\"\n\nfrom .routes import register_routes\nfrom .database import init_db\n\n\ndef create_app():\n    \"\"\"Create and configure the Flask application.\"\"\"\n    app = __import__(\"flask\").Flask(__name__)\n    app.config[\"DATABASE_URL\"] = \"sqlite:///app.db\"\n    app.config[\"SECRET_KEY\"] = \"dev-secret-key\"\n    register_routes(app)\n    init_db()\n    return app",
+          "start_line": 1,
+          "end_line": 14,
+          "chunk_type": "code",
+          "file_path": "webapp/app.py",
+          "rank": -1.717224030778337e-06
+        },
+        {
+          "id": 13,
+          "file_id": "eval_webapp:webapp/routes.py",
+          "content": "\"\"\"Route handlers for the web application.\"\"\"\n\nfrom .models import User, Post\n\n\ndef register_routes(app):\n    \"\"\"Register all URL routes with the Flask app.\"\"\"\n    app.add_url_rule(\"/\", \"index\", index_handler)\n    app.add_url_rule(\"/users/<int:user_id>\", \"user\", user_handler)\n\n\ndef index_handler():\n    \"\"\"Handle the root URL.\"\"\"\n    return \"Hello, World!\"\n\n\ndef user_handler(user_id):\n    \"\"\"Handle a user profile request.\"\"\"\n    user = User.query.get(user_id)\n    if user is None:\n        raise ValueError(f\"User {user_id} not found\")\n    return user.name",
+          "start_line": 1,
+          "end_line": 22,
+          "chunk_type": "code",
+          "file_path": "webapp/routes.py",
+          "rank": -9.957527135441248e-07
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q016",
+      "query": "transform_data",
+      "category": "cross_file",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/pipeline.py",
+        "dataproc/transformer.py"
+      ],
+      "expected_symbols": [
+        "transform_data"
+      ],
+      "retrieved_files": [
+        "dataproc/pipeline.py",
+        "dataproc/transformer.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.5,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.4,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.2,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 2.0,
+        "num_relevant": 2.0,
+        "num_relevant_retrieved": 2.0
+      },
+      "raw_results": [
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -1.7479158509731592
+        },
+        {
+          "id": 5,
+          "file_id": "eval_dataproc:dataproc/transformer.py",
+          "content": "\"\"\"Data transformers for the processing pipeline.\"\"\"\n\n\ndef transform_data(rows):\n    \"\"\"Apply a series of transformations to data rows.\"\"\"\n    cleaned = clean_data(rows)\n    normalized = normalize_values(cleaned)\n    return normalized\n\n\ndef clean_data(rows):\n    \"\"\"Remove empty rows and trim whitespace from string values.\"\"\"\n    cleaned = []\n    for row in rows:\n        if not row:\n            continue\n        cleaned_row = {k: v.strip() if isinstance(v, str) else v for k, v in row.items()}\n        cleaned.append(cleaned_row)\n    return cleaned\n\n\ndef normalize_values(rows):\n    \"\"\"Normalize numeric values to a 0-1 range.\"\"\"\n    return rows",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/transformer.py",
+          "rank": -1.4823707543366578
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q017",
+      "query": "read_json",
+      "category": "cross_file",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/pipeline.py",
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [
+        "read_json"
+      ],
+      "retrieved_files": [
+        "dataproc/pipeline.py",
+        "dataproc/reader.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.5,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.4,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.2,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 2.0,
+        "num_relevant": 2.0,
+        "num_relevant_retrieved": 2.0
+      },
+      "raw_results": [
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -1.7479158509731592
+        },
+        {
+          "id": 4,
+          "file_id": "eval_dataproc:dataproc/reader.py",
+          "content": "\"\"\"File readers for the data processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef read_csv(path):\n    \"\"\"Read a CSV file and return rows as dictionaries.\"\"\"\n    with open(path, newline=\"\") as f:\n        reader = csv.DictReader(f)\n        return list(reader)\n\n\ndef read_json(path):\n    \"\"\"Read a JSON file and return the parsed object.\"\"\"\n    with open(path, \"r\") as f:\n        return json.load(f)\n\n\ndef read_text(path):\n    \"\"\"Read a text file and return its contents as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/reader.py",
+          "rank": -1.5044712570241727
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q018",
+      "query": "register_routes",
+      "category": "cross_file",
+      "repo": "webapp",
+      "should_have_results": true,
+      "expected_files": [
+        "webapp/app.py",
+        "webapp/routes.py"
+      ],
+      "expected_symbols": [
+        "register_routes"
+      ],
+      "retrieved_files": [
+        "webapp/app.py",
+        "webapp/routes.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0005,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.5,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.4,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.2,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 2.0,
+        "num_relevant": 2.0,
+        "num_relevant_retrieved": 2.0
+      },
+      "raw_results": [
+        {
+          "id": 10,
+          "file_id": "eval_webapp:webapp/app.py",
+          "content": "\"\"\"Web application entry point.\"\"\"\n\nfrom .routes import register_routes\nfrom .database import init_db\n\n\ndef create_app():\n    \"\"\"Create and configure the Flask application.\"\"\"\n    app = __import__(\"flask\").Flask(__name__)\n    app.config[\"DATABASE_URL\"] = \"sqlite:///app.db\"\n    app.config[\"SECRET_KEY\"] = \"dev-secret-key\"\n    register_routes(app)\n    init_db()\n    return app",
+          "start_line": 1,
+          "end_line": 14,
+          "chunk_type": "code",
+          "file_path": "webapp/app.py",
+          "rank": -2.3614752186225814
+        },
+        {
+          "id": 13,
+          "file_id": "eval_webapp:webapp/routes.py",
+          "content": "\"\"\"Route handlers for the web application.\"\"\"\n\nfrom .models import User, Post\n\n\ndef register_routes(app):\n    \"\"\"Register all URL routes with the Flask app.\"\"\"\n    app.add_url_rule(\"/\", \"index\", index_handler)\n    app.add_url_rule(\"/users/<int:user_id>\", \"user\", user_handler)\n\n\ndef index_handler():\n    \"\"\"Handle the root URL.\"\"\"\n    return \"Hello, World!\"\n\n\ndef user_handler(user_id):\n    \"\"\"Handle a user profile request.\"\"\"\n    user = User.query.get(user_id)\n    if user is None:\n        raise ValueError(f\"User {user_id} not found\")\n    return user.name",
+          "start_line": 1,
+          "end_line": 22,
+          "chunk_type": "code",
+          "file_path": "webapp/routes.py",
+          "rank": -1.5195747052263116
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q019",
+      "query": "how to add two numbers",
+      "category": "natural_language",
+      "repo": "calc",
+      "should_have_results": true,
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [
+        "add"
+      ],
+      "retrieved_files": [
+        "calc/operations.py",
+        "calc/calculator.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.5,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.4,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.2,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 2.0,
+        "num_relevant": 2.0,
+        "num_relevant_retrieved": 2.0
+      },
+      "raw_results": [
+        {
+          "id": 2,
+          "file_id": "eval_calc:calc/operations.py",
+          "content": "\"\"\"Standalone mathematical operations.\"\"\"\n\n\ndef add(a, b):\n    \"\"\"Return the sum of two numbers.\"\"\"\n    return a + b\n\n\ndef subtract(a, b):\n    \"\"\"Return the difference of two numbers.\"\"\"\n    return a - b\n\n\ndef multiply(a, b):\n    \"\"\"Return the product of two numbers.\"\"\"\n    return a * b\n\n\ndef divide(a, b):\n    \"\"\"Return the quotient of two numbers.\"\"\"\n    if b == 0:\n        raise ValueError(\"Cannot divide by zero\")\n    return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/operations.py",
+          "rank": -7.6076194313499945
+        },
+        {
+          "id": 1,
+          "file_id": "eval_calc:calc/calculator.py",
+          "content": "\"\"\"Calculator module with basic arithmetic operations.\"\"\"\n\n\nclass Calculator:\n    \"\"\"A simple calculator supporting basic arithmetic.\"\"\"\n\n    def add(self, a, b):\n        \"\"\"Return the sum of a and b.\"\"\"\n        return a + b\n\n    def subtract(self, a, b):\n        \"\"\"Return the difference of a and b.\"\"\"\n        return a - b\n\n    def multiply(self, a, b):\n        \"\"\"Return the product of a and b.\"\"\"\n        return a * b\n\n    def divide(self, a, b):\n        \"\"\"Return the quotient of a and b.\"\"\"\n        if b == 0:\n            raise ValueError(\"Cannot divide by zero\")\n        return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/calculator.py",
+          "rank": -1.08848250746977
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q020",
+      "query": "how to read a CSV file",
+      "category": "natural_language",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [
+        "read_csv"
+      ],
+      "retrieved_files": [
+        "dataproc/reader.py",
+        "dataproc/pipeline.py",
+        "dataproc/writer.py",
+        "dataproc/transformer.py"
+      ],
+      "num_retrieved": 4,
+      "search_duration_seconds": 0.0005,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 4.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 4,
+          "file_id": "eval_dataproc:dataproc/reader.py",
+          "content": "\"\"\"File readers for the data processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef read_csv(path):\n    \"\"\"Read a CSV file and return rows as dictionaries.\"\"\"\n    with open(path, newline=\"\") as f:\n        reader = csv.DictReader(f)\n        return list(reader)\n\n\ndef read_json(path):\n    \"\"\"Read a JSON file and return the parsed object.\"\"\"\n    with open(path, \"r\") as f:\n        return json.load(f)\n\n\ndef read_text(path):\n    \"\"\"Read a text file and return its contents as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/reader.py",
+          "rank": -5.160197833168909
+        },
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -4.833792688962403
+        },
+        {
+          "id": 6,
+          "file_id": "eval_dataproc:dataproc/writer.py",
+          "content": "\"\"\"Data writers for the processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef write_csv(path, rows, fieldnames=None):\n    \"\"\"Write rows to a CSV file.\"\"\"\n    if fieldnames is None and rows:\n        fieldnames = list(rows[0].keys())\n    with open(path, \"w\", newline=\"\") as f:\n        writer = csv.DictWriter(f, fieldnames=fieldnames)\n        writer.writeheader()\n        writer.writerows(rows)\n\n\ndef write_json(path, data):\n    \"\"\"Write data to a JSON file.\"\"\"\n    with open(path, \"w\") as f:\n        json.dump(data, f, indent=2)\n\n\ndef write_text(path, content):\n    \"\"\"Write text content to a file.\"\"\"\n    with open(path, \"w\") as f:\n        f.write(content)",
+          "start_line": 1,
+          "end_line": 27,
+          "chunk_type": "code",
+          "file_path": "dataproc/writer.py",
+          "rank": -3.1555851550866434
+        },
+        {
+          "id": 5,
+          "file_id": "eval_dataproc:dataproc/transformer.py",
+          "content": "\"\"\"Data transformers for the processing pipeline.\"\"\"\n\n\ndef transform_data(rows):\n    \"\"\"Apply a series of transformations to data rows.\"\"\"\n    cleaned = clean_data(rows)\n    normalized = normalize_values(cleaned)\n    return normalized\n\n\ndef clean_data(rows):\n    \"\"\"Remove empty rows and trim whitespace from string values.\"\"\"\n    cleaned = []\n    for row in rows:\n        if not row:\n            continue\n        cleaned_row = {k: v.strip() if isinstance(v, str) else v for k, v in row.items()}\n        cleaned.append(cleaned_row)\n    return cleaned\n\n\ndef normalize_values(rows):\n    \"\"\"Normalize numeric values to a 0-1 range.\"\"\"\n    return rows",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/transformer.py",
+          "rank": -0.1928576118278961
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q021",
+      "query": "how to write JSON data",
+      "category": "natural_language",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/writer.py"
+      ],
+      "expected_symbols": [
+        "write_json"
+      ],
+      "retrieved_files": [
+        "dataproc/pipeline.py",
+        "dataproc/writer.py",
+        "dataproc/reader.py",
+        "dataproc/transformer.py"
+      ],
+      "num_retrieved": 4,
+      "search_duration_seconds": 0.0005,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.0,
+        "precision@1": 0.0,
+        "ndcg@1": 0.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 0.6309297535714575,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "average_precision": 0.5,
+        "num_retrieved": 4.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -5.336797284528284
+        },
+        {
+          "id": 6,
+          "file_id": "eval_dataproc:dataproc/writer.py",
+          "content": "\"\"\"Data writers for the processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef write_csv(path, rows, fieldnames=None):\n    \"\"\"Write rows to a CSV file.\"\"\"\n    if fieldnames is None and rows:\n        fieldnames = list(rows[0].keys())\n    with open(path, \"w\", newline=\"\") as f:\n        writer = csv.DictWriter(f, fieldnames=fieldnames)\n        writer.writeheader()\n        writer.writerows(rows)\n\n\ndef write_json(path, data):\n    \"\"\"Write data to a JSON file.\"\"\"\n    with open(path, \"w\") as f:\n        json.dump(data, f, indent=2)\n\n\ndef write_text(path, content):\n    \"\"\"Write text content to a file.\"\"\"\n    with open(path, \"w\") as f:\n        f.write(content)",
+          "start_line": 1,
+          "end_line": 27,
+          "chunk_type": "code",
+          "file_path": "dataproc/writer.py",
+          "rank": -5.2763725429050226
+        },
+        {
+          "id": 4,
+          "file_id": "eval_dataproc:dataproc/reader.py",
+          "content": "\"\"\"File readers for the data processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef read_csv(path):\n    \"\"\"Read a CSV file and return rows as dictionaries.\"\"\"\n    with open(path, newline=\"\") as f:\n        reader = csv.DictReader(f)\n        return list(reader)\n\n\ndef read_json(path):\n    \"\"\"Read a JSON file and return the parsed object.\"\"\"\n    with open(path, \"r\") as f:\n        return json.load(f)\n\n\ndef read_text(path):\n    \"\"\"Read a text file and return its contents as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/reader.py",
+          "rank": -2.5846183921018677
+        },
+        {
+          "id": 5,
+          "file_id": "eval_dataproc:dataproc/transformer.py",
+          "content": "\"\"\"Data transformers for the processing pipeline.\"\"\"\n\n\ndef transform_data(rows):\n    \"\"\"Apply a series of transformations to data rows.\"\"\"\n    cleaned = clean_data(rows)\n    normalized = normalize_values(cleaned)\n    return normalized\n\n\ndef clean_data(rows):\n    \"\"\"Remove empty rows and trim whitespace from string values.\"\"\"\n    cleaned = []\n    for row in rows:\n        if not row:\n            continue\n        cleaned_row = {k: v.strip() if isinstance(v, str) else v for k, v in row.items()}\n        cleaned.append(cleaned_row)\n    return cleaned\n\n\ndef normalize_values(rows):\n    \"\"\"Normalize numeric values to a 0-1 range.\"\"\"\n    return rows",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/transformer.py",
+          "rank": -1.5048396715890917
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q022",
+      "query": "how to truncate a string",
+      "category": "natural_language",
+      "repo": "utils",
+      "should_have_results": true,
+      "expected_files": [
+        "utils/string_utils.py"
+      ],
+      "expected_symbols": [
+        "truncate"
+      ],
+      "retrieved_files": [
+        "utils/string_utils.py",
+        "utils/file_utils.py",
+        "utils/math_utils.py"
+      ],
+      "num_retrieved": 3,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 3.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 9,
+          "file_id": "eval_utils:utils/string_utils.py",
+          "content": "\"\"\"String manipulation utilities.\"\"\"\n\n\ndef slugify(text):\n    \"\"\"Convert a string to a URL-friendly slug.\"\"\"\n    return text.lower().strip().replace(\" \", \"-\")\n\n\ndef capitalize_words(text):\n    \"\"\"Capitalize the first letter of each word.\"\"\"\n    return \" \".join(word.capitalize() for word in text.split())\n\n\ndef truncate(text, max_length):\n    \"\"\"Truncate a string to the specified maximum length.\"\"\"\n    if len(text) <= max_length:\n        return text\n    return text[:max_length] + \"...\"",
+          "start_line": 1,
+          "end_line": 18,
+          "chunk_type": "code",
+          "file_path": "utils/string_utils.py",
+          "rank": -4.554384695704063
+        },
+        {
+          "id": 7,
+          "file_id": "eval_utils:utils/file_utils.py",
+          "content": "\"\"\"File operation utilities.\"\"\"\n\n\nimport os\n\n\ndef read_file(path):\n    \"\"\"Read the contents of a file and return as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()\n\n\ndef write_file(path, content):\n    \"\"\"Write content to a file.\"\"\"\n    with open(path, \"w\") as f:\n        f.write(content)\n\n\ndef list_files(directory):\n    \"\"\"List all files in a directory.\"\"\"\n    return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]\n\n\ndef file_exists(path):\n    \"\"\"Check whether a file exists at the given path.\"\"\"\n    return os.path.exists(path)",
+          "start_line": 1,
+          "end_line": 26,
+          "chunk_type": "code",
+          "file_path": "utils/file_utils.py",
+          "rank": -0.840147161325632
+        },
+        {
+          "id": 8,
+          "file_id": "eval_utils:utils/math_utils.py",
+          "content": "\"\"\"Mathematical helper functions.\"\"\"\n\n\ndef average(numbers):\n    \"\"\"Return the arithmetic mean of a list of numbers.\"\"\"\n    if not numbers:\n        return 0\n    return sum(numbers) / len(numbers)\n\n\ndef clamp(value, min_value, max_value):\n    \"\"\"Clamp a value to the specified range.\"\"\"\n    return max(min_value, min(value, max_value))\n\n\ndef is_even(number):\n    \"\"\"Return True if the number is even.\"\"\"\n    return number % 2 == 0",
+          "start_line": 1,
+          "end_line": 18,
+          "chunk_type": "code",
+          "file_path": "utils/math_utils.py",
+          "rank": -0.15839579680748084
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q023",
+      "query": "compute sum",
+      "category": "synonym",
+      "repo": "calc",
+      "should_have_results": true,
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [
+        "add"
+      ],
+      "retrieved_files": [
+        "calc/operations.py",
+        "calc/calculator.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.5,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.4,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.2,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 2.0,
+        "num_relevant": 2.0,
+        "num_relevant_retrieved": 2.0
+      },
+      "raw_results": [
+        {
+          "id": 2,
+          "file_id": "eval_calc:calc/operations.py",
+          "content": "\"\"\"Standalone mathematical operations.\"\"\"\n\n\ndef add(a, b):\n    \"\"\"Return the sum of two numbers.\"\"\"\n    return a + b\n\n\ndef subtract(a, b):\n    \"\"\"Return the difference of two numbers.\"\"\"\n    return a - b\n\n\ndef multiply(a, b):\n    \"\"\"Return the product of two numbers.\"\"\"\n    return a * b\n\n\ndef divide(a, b):\n    \"\"\"Return the quotient of two numbers.\"\"\"\n    if b == 0:\n        raise ValueError(\"Cannot divide by zero\")\n    return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/operations.py",
+          "rank": -1.202602991085546
+        },
+        {
+          "id": 1,
+          "file_id": "eval_calc:calc/calculator.py",
+          "content": "\"\"\"Calculator module with basic arithmetic operations.\"\"\"\n\n\nclass Calculator:\n    \"\"\"A simple calculator supporting basic arithmetic.\"\"\"\n\n    def add(self, a, b):\n        \"\"\"Return the sum of a and b.\"\"\"\n        return a + b\n\n    def subtract(self, a, b):\n        \"\"\"Return the difference of a and b.\"\"\"\n        return a - b\n\n    def multiply(self, a, b):\n        \"\"\"Return the product of a and b.\"\"\"\n        return a * b\n\n    def divide(self, a, b):\n        \"\"\"Return the quotient of a and b.\"\"\"\n        if b == 0:\n            raise ValueError(\"Cannot divide by zero\")\n        return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/calculator.py",
+          "rank": -1.08848250746977
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q024",
+      "query": "data transformation",
+      "category": "synonym",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/transformer.py"
+      ],
+      "expected_symbols": [
+        "transform_data"
+      ],
+      "retrieved_files": [
+        "dataproc/pipeline.py",
+        "dataproc/transformer.py",
+        "dataproc/writer.py",
+        "dataproc/reader.py"
+      ],
+      "num_retrieved": 4,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.0,
+        "precision@1": 0.0,
+        "ndcg@1": 0.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 0.6309297535714575,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "average_precision": 0.5,
+        "num_retrieved": 4.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -1.4741990578642443
+        },
+        {
+          "id": 5,
+          "file_id": "eval_dataproc:dataproc/transformer.py",
+          "content": "\"\"\"Data transformers for the processing pipeline.\"\"\"\n\n\ndef transform_data(rows):\n    \"\"\"Apply a series of transformations to data rows.\"\"\"\n    cleaned = clean_data(rows)\n    normalized = normalize_values(cleaned)\n    return normalized\n\n\ndef clean_data(rows):\n    \"\"\"Remove empty rows and trim whitespace from string values.\"\"\"\n    cleaned = []\n    for row in rows:\n        if not row:\n            continue\n        cleaned_row = {k: v.strip() if isinstance(v, str) else v for k, v in row.items()}\n        cleaned.append(cleaned_row)\n    return cleaned\n\n\ndef normalize_values(rows):\n    \"\"\"Normalize numeric values to a 0-1 range.\"\"\"\n    return rows",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/transformer.py",
+          "rank": -1.3119834074560046
+        },
+        {
+          "id": 6,
+          "file_id": "eval_dataproc:dataproc/writer.py",
+          "content": "\"\"\"Data writers for the processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef write_csv(path, rows, fieldnames=None):\n    \"\"\"Write rows to a CSV file.\"\"\"\n    if fieldnames is None and rows:\n        fieldnames = list(rows[0].keys())\n    with open(path, \"w\", newline=\"\") as f:\n        writer = csv.DictWriter(f, fieldnames=fieldnames)\n        writer.writeheader()\n        writer.writerows(rows)\n\n\ndef write_json(path, data):\n    \"\"\"Write data to a JSON file.\"\"\"\n    with open(path, \"w\") as f:\n        json.dump(data, f, indent=2)\n\n\ndef write_text(path, content):\n    \"\"\"Write text content to a file.\"\"\"\n    with open(path, \"w\") as f:\n        f.write(content)",
+          "start_line": 1,
+          "end_line": 27,
+          "chunk_type": "code",
+          "file_path": "dataproc/writer.py",
+          "rank": -1.2282469027251723
+        },
+        {
+          "id": 4,
+          "file_id": "eval_dataproc:dataproc/reader.py",
+          "content": "\"\"\"File readers for the data processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef read_csv(path):\n    \"\"\"Read a CSV file and return rows as dictionaries.\"\"\"\n    with open(path, newline=\"\") as f:\n        reader = csv.DictReader(f)\n        return list(reader)\n\n\ndef read_json(path):\n    \"\"\"Read a JSON file and return the parsed object.\"\"\"\n    with open(path, \"r\") as f:\n        return json.load(f)\n\n\ndef read_text(path):\n    \"\"\"Read a text file and return its contents as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/reader.py",
+          "rank": -0.7366455535182193
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q025",
+      "query": "file reader",
+      "category": "synonym",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [
+        "read_csv"
+      ],
+      "retrieved_files": [
+        "dataproc/reader.py",
+        "dataproc/pipeline.py",
+        "dataproc/writer.py"
+      ],
+      "num_retrieved": 3,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 3.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 4,
+          "file_id": "eval_dataproc:dataproc/reader.py",
+          "content": "\"\"\"File readers for the data processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef read_csv(path):\n    \"\"\"Read a CSV file and return rows as dictionaries.\"\"\"\n    with open(path, newline=\"\") as f:\n        reader = csv.DictReader(f)\n        return list(reader)\n\n\ndef read_json(path):\n    \"\"\"Read a JSON file and return the parsed object.\"\"\"\n    with open(path, \"r\") as f:\n        return json.load(f)\n\n\ndef read_text(path):\n    \"\"\"Read a text file and return its contents as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/reader.py",
+          "rank": -3.3347195903494633
+        },
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -2.0373705026389173
+        },
+        {
+          "id": 6,
+          "file_id": "eval_dataproc:dataproc/writer.py",
+          "content": "\"\"\"Data writers for the processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef write_csv(path, rows, fieldnames=None):\n    \"\"\"Write rows to a CSV file.\"\"\"\n    if fieldnames is None and rows:\n        fieldnames = list(rows[0].keys())\n    with open(path, \"w\", newline=\"\") as f:\n        writer = csv.DictWriter(f, fieldnames=fieldnames)\n        writer.writeheader()\n        writer.writerows(rows)\n\n\ndef write_json(path, data):\n    \"\"\"Write data to a JSON file.\"\"\"\n    with open(path, \"w\") as f:\n        json.dump(data, f, indent=2)\n\n\ndef write_text(path, content):\n    \"\"\"Write text content to a file.\"\"\"\n    with open(path, \"w\") as f:\n        f.write(content)",
+          "start_line": 1,
+          "end_line": 27,
+          "chunk_type": "code",
+          "file_path": "dataproc/writer.py",
+          "rank": -1.1327789854003547
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q026",
+      "query": "DATABASE_URL",
+      "category": "config_discovery",
+      "repo": "webapp",
+      "should_have_results": true,
+      "expected_files": [
+        "webapp/app.py"
+      ],
+      "expected_symbols": [],
+      "retrieved_files": [
+        "webapp/app.py"
+      ],
+      "num_retrieved": 1,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 1.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 10,
+          "file_id": "eval_webapp:webapp/app.py",
+          "content": "\"\"\"Web application entry point.\"\"\"\n\nfrom .routes import register_routes\nfrom .database import init_db\n\n\ndef create_app():\n    \"\"\"Create and configure the Flask application.\"\"\"\n    app = __import__(\"flask\").Flask(__name__)\n    app.config[\"DATABASE_URL\"] = \"sqlite:///app.db\"\n    app.config[\"SECRET_KEY\"] = \"dev-secret-key\"\n    register_routes(app)\n    init_db()\n    return app",
+          "start_line": 1,
+          "end_line": 14,
+          "chunk_type": "code",
+          "file_path": "webapp/app.py",
+          "rank": -2.5304050120940005
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q027",
+      "query": "SECRET_KEY",
+      "category": "config_discovery",
+      "repo": "webapp",
+      "should_have_results": true,
+      "expected_files": [
+        "webapp/app.py"
+      ],
+      "expected_symbols": [],
+      "retrieved_files": [
+        "webapp/app.py"
+      ],
+      "num_retrieved": 1,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 1.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 10,
+          "file_id": "eval_webapp:webapp/app.py",
+          "content": "\"\"\"Web application entry point.\"\"\"\n\nfrom .routes import register_routes\nfrom .database import init_db\n\n\ndef create_app():\n    \"\"\"Create and configure the Flask application.\"\"\"\n    app = __import__(\"flask\").Flask(__name__)\n    app.config[\"DATABASE_URL\"] = \"sqlite:///app.db\"\n    app.config[\"SECRET_KEY\"] = \"dev-secret-key\"\n    register_routes(app)\n    init_db()\n    return app",
+          "start_line": 1,
+          "end_line": 14,
+          "chunk_type": "code",
+          "file_path": "webapp/app.py",
+          "rank": -3.280973176558712
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q028",
+      "query": "raise ValueError",
+      "category": "error_handling",
+      "repo": "calc",
+      "should_have_results": true,
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [],
+      "retrieved_files": [
+        "calc/operations.py",
+        "calc/calculator.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.5,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.4,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.2,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 2.0,
+        "num_relevant": 2.0,
+        "num_relevant_retrieved": 2.0
+      },
+      "raw_results": [
+        {
+          "id": 2,
+          "file_id": "eval_calc:calc/operations.py",
+          "content": "\"\"\"Standalone mathematical operations.\"\"\"\n\n\ndef add(a, b):\n    \"\"\"Return the sum of two numbers.\"\"\"\n    return a + b\n\n\ndef subtract(a, b):\n    \"\"\"Return the difference of two numbers.\"\"\"\n    return a - b\n\n\ndef multiply(a, b):\n    \"\"\"Return the product of two numbers.\"\"\"\n    return a * b\n\n\ndef divide(a, b):\n    \"\"\"Return the quotient of two numbers.\"\"\"\n    if b == 0:\n        raise ValueError(\"Cannot divide by zero\")\n    return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/operations.py",
+          "rank": -2.405205982171092
+        },
+        {
+          "id": 1,
+          "file_id": "eval_calc:calc/calculator.py",
+          "content": "\"\"\"Calculator module with basic arithmetic operations.\"\"\"\n\n\nclass Calculator:\n    \"\"\"A simple calculator supporting basic arithmetic.\"\"\"\n\n    def add(self, a, b):\n        \"\"\"Return the sum of a and b.\"\"\"\n        return a + b\n\n    def subtract(self, a, b):\n        \"\"\"Return the difference of a and b.\"\"\"\n        return a - b\n\n    def multiply(self, a, b):\n        \"\"\"Return the product of a and b.\"\"\"\n        return a * b\n\n    def divide(self, a, b):\n        \"\"\"Return the quotient of a and b.\"\"\"\n        if b == 0:\n            raise ValueError(\"Cannot divide by zero\")\n        return a / b",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "calc/calculator.py",
+          "rank": -2.17696501493954
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q029",
+      "query": "if user is None",
+      "category": "error_handling",
+      "repo": "webapp",
+      "should_have_results": true,
+      "expected_files": [
+        "webapp/routes.py"
+      ],
+      "expected_symbols": [],
+      "retrieved_files": [
+        "webapp/routes.py",
+        "webapp/models.py",
+        "webapp/database.py"
+      ],
+      "num_retrieved": 3,
+      "search_duration_seconds": 0.0005,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 3.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 13,
+          "file_id": "eval_webapp:webapp/routes.py",
+          "content": "\"\"\"Route handlers for the web application.\"\"\"\n\nfrom .models import User, Post\n\n\ndef register_routes(app):\n    \"\"\"Register all URL routes with the Flask app.\"\"\"\n    app.add_url_rule(\"/\", \"index\", index_handler)\n    app.add_url_rule(\"/users/<int:user_id>\", \"user\", user_handler)\n\n\ndef index_handler():\n    \"\"\"Handle the root URL.\"\"\"\n    return \"Hello, World!\"\n\n\ndef user_handler(user_id):\n    \"\"\"Handle a user profile request.\"\"\"\n    user = User.query.get(user_id)\n    if user is None:\n        raise ValueError(f\"User {user_id} not found\")\n    return user.name",
+          "start_line": 1,
+          "end_line": 22,
+          "chunk_type": "code",
+          "file_path": "webapp/routes.py",
+          "rank": -5.278257444211546
+        },
+        {
+          "id": 12,
+          "file_id": "eval_webapp:webapp/models.py",
+          "content": "\"\"\"Database models for the web application.\"\"\"\n\n\nclass User:\n    \"\"\"A user account in the system.\"\"\"\n\n    def __init__(self, user_id, name, email):\n        self.user_id = user_id\n        self.name = name\n        self.email = email\n\n    @classmethod\n    def query(cls, filter=None):\n        \"\"\"Query the database for users.\"\"\"\n        return []\n\n\nclass Post:\n    \"\"\"A blog post written by a user.\"\"\"\n\n    def __init__(self, post_id, title, content, author_id):\n        self.post_id = post_id\n        self.title = title\n        self.content = content\n        self.author_id = author_id",
+          "start_line": 1,
+          "end_line": 25,
+          "chunk_type": "code",
+          "file_path": "webapp/models.py",
+          "rank": -3.9277878427371453
+        },
+        {
+          "id": 11,
+          "file_id": "eval_webapp:webapp/database.py",
+          "content": "\"\"\"Database connection and session management.\"\"\"\n\n\nimport sqlite3\n\n\ndef init_db():\n    \"\"\"Initialize the database and create tables.\"\"\"\n    conn = sqlite3.connect(\"app.db\")\n    cursor = conn.cursor()\n    cursor.execute(\n        \"CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)\"\n    )\n    cursor.execute(\n        \"CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT, content TEXT, author_id INTEGER)\"\n    )\n    conn.commit()\n    conn.close()\n\n\ndef get_connection():\n    \"\"\"Return a new database connection.\"\"\"\n    return sqlite3.connect(\"app.db\")",
+          "start_line": 1,
+          "end_line": 23,
+          "chunk_type": "code",
+          "file_path": "webapp/database.py",
+          "rank": -1.4000060319087976e-06
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q030",
+      "query": "quantum computing",
+      "category": "no_result",
+      "repo": "calc",
+      "should_have_results": false,
+      "expected_files": [],
+      "expected_symbols": [],
+      "retrieved_files": [],
+      "num_retrieved": 0,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.0,
+        "precision@1": 0.0,
+        "ndcg@1": 0.0,
+        "recall@5": 0.0,
+        "precision@5": 0.0,
+        "ndcg@5": 0.0,
+        "recall@10": 0.0,
+        "precision@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "average_precision": 0.0,
+        "num_retrieved": 0.0,
+        "num_relevant": 0.0,
+        "num_relevant_retrieved": 0.0
+      },
+      "raw_results": [],
+      "failure_category": null
+    },
+    {
+      "query_id": "q031",
+      "query": "nonexistent_function_xyz",
+      "category": "no_result",
+      "repo": "calc",
+      "should_have_results": false,
+      "expected_files": [],
+      "expected_symbols": [],
+      "retrieved_files": [],
+      "num_retrieved": 0,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.0,
+        "precision@1": 0.0,
+        "ndcg@1": 0.0,
+        "recall@5": 0.0,
+        "precision@5": 0.0,
+        "ndcg@5": 0.0,
+        "recall@10": 0.0,
+        "precision@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "average_precision": 0.0,
+        "num_retrieved": 0.0,
+        "num_relevant": 0.0,
+        "num_relevant_retrieved": 0.0
+      },
+      "raw_results": [],
+      "failure_category": null
+    },
+    {
+      "query_id": "q032",
+      "query": "machine learning model",
+      "category": "no_result",
+      "repo": "webapp",
+      "should_have_results": false,
+      "expected_files": [],
+      "expected_symbols": [],
+      "retrieved_files": [],
+      "num_retrieved": 0,
+      "search_duration_seconds": 0.0005,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.0,
+        "precision@1": 0.0,
+        "ndcg@1": 0.0,
+        "recall@5": 0.0,
+        "precision@5": 0.0,
+        "ndcg@5": 0.0,
+        "recall@10": 0.0,
+        "precision@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "average_precision": 0.0,
+        "num_retrieved": 0.0,
+        "num_relevant": 0.0,
+        "num_relevant_retrieved": 0.0
+      },
+      "raw_results": [],
+      "failure_category": null
+    },
+    {
+      "query_id": "q033",
+      "query": "read",
+      "category": "ambiguous",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [
+        "read_csv",
+        "read_json",
+        "read_text"
+      ],
+      "retrieved_files": [
+        "dataproc/reader.py",
+        "dataproc/pipeline.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 2.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 4,
+          "file_id": "eval_dataproc:dataproc/reader.py",
+          "content": "\"\"\"File readers for the data processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef read_csv(path):\n    \"\"\"Read a CSV file and return rows as dictionaries.\"\"\"\n    with open(path, newline=\"\") as f:\n        reader = csv.DictReader(f)\n        return list(reader)\n\n\ndef read_json(path):\n    \"\"\"Read a JSON file and return the parsed object.\"\"\"\n    with open(path, \"r\") as f:\n        return json.load(f)\n\n\ndef read_text(path):\n    \"\"\"Read a text file and return its contents as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/reader.py",
+          "rank": -2.0553359342711306
+        },
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -1.849346621699074
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q034",
+      "query": "write",
+      "category": "ambiguous",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/writer.py"
+      ],
+      "expected_symbols": [
+        "write_csv",
+        "write_json",
+        "write_text"
+      ],
+      "retrieved_files": [
+        "dataproc/writer.py",
+        "dataproc/pipeline.py"
+      ],
+      "num_retrieved": 2,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 1.0,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.2,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.1,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 2.0,
+        "num_relevant": 1.0,
+        "num_relevant_retrieved": 1.0
+      },
+      "raw_results": [
+        {
+          "id": 6,
+          "file_id": "eval_dataproc:dataproc/writer.py",
+          "content": "\"\"\"Data writers for the processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef write_csv(path, rows, fieldnames=None):\n    \"\"\"Write rows to a CSV file.\"\"\"\n    if fieldnames is None and rows:\n        fieldnames = list(rows[0].keys())\n    with open(path, \"w\", newline=\"\") as f:\n        writer = csv.DictWriter(f, fieldnames=fieldnames)\n        writer.writeheader()\n        writer.writerows(rows)\n\n\ndef write_json(path, data):\n    \"\"\"Write data to a JSON file.\"\"\"\n    with open(path, \"w\") as f:\n        json.dump(data, f, indent=2)\n\n\ndef write_text(path, content):\n    \"\"\"Write text content to a file.\"\"\"\n    with open(path, \"w\") as f:\n        f.write(content)",
+          "start_line": 1,
+          "end_line": 27,
+          "chunk_type": "code",
+          "file_path": "dataproc/writer.py",
+          "rank": -2.025320986496174
+        },
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -1.849346621699074
+        }
+      ],
+      "failure_category": null
+    },
+    {
+      "query_id": "q035",
+      "query": "data",
+      "category": "ambiguous",
+      "repo": "dataproc",
+      "should_have_results": true,
+      "expected_files": [
+        "dataproc/pipeline.py",
+        "dataproc/transformer.py",
+        "dataproc/writer.py"
+      ],
+      "expected_symbols": [],
+      "retrieved_files": [
+        "dataproc/pipeline.py",
+        "dataproc/transformer.py",
+        "dataproc/writer.py",
+        "dataproc/reader.py"
+      ],
+      "num_retrieved": 4,
+      "search_duration_seconds": 0.0004,
+      "search_error": null,
+      "metrics": {
+        "recall@1": 0.3333333333333333,
+        "precision@1": 1.0,
+        "ndcg@1": 1.0,
+        "recall@5": 1.0,
+        "precision@5": 0.6,
+        "ndcg@5": 1.0,
+        "recall@10": 1.0,
+        "precision@10": 0.3,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "average_precision": 1.0,
+        "num_retrieved": 4.0,
+        "num_relevant": 3.0,
+        "num_relevant_retrieved": 3.0
+      },
+      "raw_results": [
+        {
+          "id": 3,
+          "file_id": "eval_dataproc:dataproc/pipeline.py",
+          "content": "\"\"\"Pipeline orchestration for data processing.\"\"\"\n\n\nfrom .reader import read_csv, read_json, read_text\nfrom .transformer import transform_data\nfrom .writer import write_csv, write_json, write_text\n\n\ndef run_pipeline(input_path, output_path, output_format=\"csv\"):\n    \"\"\"Run the full data processing pipeline from input to output.\"\"\"\n    data = load_data(input_path)\n    transformed = transform_data(data)\n    save_data(transformed, output_path, output_format)\n    return transformed\n\n\ndef load_data(path):\n    \"\"\"Load data from a file based on its extension.\"\"\"\n    if path.endswith(\".csv\"):\n        return read_csv(path)\n    if path.endswith(\".json\"):\n        return read_json(path)\n    return read_text(path)\n\n\ndef save_data(data, path, output_format=\"csv\"):\n    \"\"\"Save transformed data to a file in the specified format.\"\"\"\n    if output_format == \"csv\":\n        write_csv(path, data)\n    elif output_format == \"json\":\n        write_json(path, data)\n    else:\n        write_text(path, str(data))",
+          "start_line": 1,
+          "end_line": 33,
+          "chunk_type": "code",
+          "file_path": "dataproc/pipeline.py",
+          "rank": -1.4741990578642443
+        },
+        {
+          "id": 5,
+          "file_id": "eval_dataproc:dataproc/transformer.py",
+          "content": "\"\"\"Data transformers for the processing pipeline.\"\"\"\n\n\ndef transform_data(rows):\n    \"\"\"Apply a series of transformations to data rows.\"\"\"\n    cleaned = clean_data(rows)\n    normalized = normalize_values(cleaned)\n    return normalized\n\n\ndef clean_data(rows):\n    \"\"\"Remove empty rows and trim whitespace from string values.\"\"\"\n    cleaned = []\n    for row in rows:\n        if not row:\n            continue\n        cleaned_row = {k: v.strip() if isinstance(v, str) else v for k, v in row.items()}\n        cleaned.append(cleaned_row)\n    return cleaned\n\n\ndef normalize_values(rows):\n    \"\"\"Normalize numeric values to a 0-1 range.\"\"\"\n    return rows",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/transformer.py",
+          "rank": -1.3119834074560046
+        },
+        {
+          "id": 6,
+          "file_id": "eval_dataproc:dataproc/writer.py",
+          "content": "\"\"\"Data writers for the processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef write_csv(path, rows, fieldnames=None):\n    \"\"\"Write rows to a CSV file.\"\"\"\n    if fieldnames is None and rows:\n        fieldnames = list(rows[0].keys())\n    with open(path, \"w\", newline=\"\") as f:\n        writer = csv.DictWriter(f, fieldnames=fieldnames)\n        writer.writeheader()\n        writer.writerows(rows)\n\n\ndef write_json(path, data):\n    \"\"\"Write data to a JSON file.\"\"\"\n    with open(path, \"w\") as f:\n        json.dump(data, f, indent=2)\n\n\ndef write_text(path, content):\n    \"\"\"Write text content to a file.\"\"\"\n    with open(path, \"w\") as f:\n        f.write(content)",
+          "start_line": 1,
+          "end_line": 27,
+          "chunk_type": "code",
+          "file_path": "dataproc/writer.py",
+          "rank": -1.2282469027251723
+        },
+        {
+          "id": 4,
+          "file_id": "eval_dataproc:dataproc/reader.py",
+          "content": "\"\"\"File readers for the data processing pipeline.\"\"\"\n\n\nimport csv\nimport json\n\n\ndef read_csv(path):\n    \"\"\"Read a CSV file and return rows as dictionaries.\"\"\"\n    with open(path, newline=\"\") as f:\n        reader = csv.DictReader(f)\n        return list(reader)\n\n\ndef read_json(path):\n    \"\"\"Read a JSON file and return the parsed object.\"\"\"\n    with open(path, \"r\") as f:\n        return json.load(f)\n\n\ndef read_text(path):\n    \"\"\"Read a text file and return its contents as a string.\"\"\"\n    with open(path, \"r\") as f:\n        return f.read()",
+          "start_line": 1,
+          "end_line": 24,
+          "chunk_type": "code",
+          "file_path": "dataproc/reader.py",
+          "rank": -0.7366455535182193
+        }
+      ],
+      "failure_category": null
+    }
+  ],
+  "metadata": {
+    "git_commit": "22ba9db01c4af45fc4cfef3da0b875d5ef4fa0ff",
+    "git_branch": "main",
+    "python_version": "3.12.14",
+    "sqlite_version": "3.53.4",
+    "os": "macOS-26.6.1-arm64-arm-64bit"
+  }
+}

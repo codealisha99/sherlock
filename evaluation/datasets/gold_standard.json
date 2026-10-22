@@ -1,0 +1,519 @@
+{
+  "dataset_version": "0.1.0",
+  "description": "Gold-standard benchmark dataset for Sherlock retrieval evaluation",
+  "num_queries": 35,
+  "queries": [
+    {
+      "query_id": "q001",
+      "query": "Calculator",
+      "description": "Exact class name lookup",
+      "category": "exact_identifier",
+      "repo": "calc",
+      "expected_files": [
+        "calc/calculator.py"
+      ],
+      "expected_symbols": [
+        "Calculator"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Exact class name match"
+    },
+    {
+      "query_id": "q002",
+      "query": "add",
+      "description": "Exact function name lookup (appears in two files)",
+      "category": "exact_identifier",
+      "repo": "calc",
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [
+        "add"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Exact function name match in multiple files"
+    },
+    {
+      "query_id": "q003",
+      "query": "read_csv",
+      "description": "Exact function name lookup",
+      "category": "exact_identifier",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [
+        "read_csv"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Exact function name match"
+    },
+    {
+      "query_id": "q004",
+      "query": "slugify",
+      "description": "Exact function name lookup",
+      "category": "exact_identifier",
+      "repo": "utils",
+      "expected_files": [
+        "utils/string_utils.py"
+      ],
+      "expected_symbols": [
+        "slugify"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Exact function name match"
+    },
+    {
+      "query_id": "q005",
+      "query": "write_json",
+      "description": "Exact function name lookup",
+      "category": "exact_identifier",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/writer.py"
+      ],
+      "expected_symbols": [
+        "write_json"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Exact function name match"
+    },
+    {
+      "query_id": "q006",
+      "query": "calc",
+      "description": "Partial identifier match (substring of calc/calculator.py)",
+      "category": "partial_identifier",
+      "repo": "calc",
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [],
+      "should_have_results": true,
+      "why_relevant": "Partial identifier match in file path and content"
+    },
+    {
+      "query_id": "q007",
+      "query": "transform",
+      "description": "Partial identifier match (substring of transform_data)",
+      "category": "partial_identifier",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/transformer.py"
+      ],
+      "expected_symbols": [
+        "transform_data"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Partial identifier match in function name"
+    },
+    {
+      "query_id": "q008",
+      "query": "reader",
+      "description": "Partial identifier match (substring of read_csv/read_json/read_text)",
+      "category": "partial_identifier",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [
+        "read_csv",
+        "read_json",
+        "read_text"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Partial identifier match in multiple function names"
+    },
+    {
+      "query_id": "q009",
+      "query": "def add",
+      "description": "Function definition keyword search",
+      "category": "function_discovery",
+      "repo": "calc",
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [
+        "add"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Keyword 'def' plus function name 'add'"
+    },
+    {
+      "query_id": "q010",
+      "query": "class Calculator",
+      "description": "Class definition keyword search",
+      "category": "class_discovery",
+      "repo": "calc",
+      "expected_files": [
+        "calc/calculator.py"
+      ],
+      "expected_symbols": [
+        "Calculator"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Keyword 'class' plus class name 'Calculator'"
+    },
+    {
+      "query_id": "q011",
+      "query": "create_app",
+      "description": "Function name lookup",
+      "category": "function_discovery",
+      "repo": "webapp",
+      "expected_files": [
+        "webapp/app.py"
+      ],
+      "expected_symbols": [
+        "create_app"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Exact function name match"
+    },
+    {
+      "query_id": "q012",
+      "query": "run_pipeline",
+      "description": "Function name lookup",
+      "category": "function_discovery",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/pipeline.py"
+      ],
+      "expected_symbols": [
+        "run_pipeline"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Exact function name match"
+    },
+    {
+      "query_id": "q013",
+      "query": "import csv",
+      "description": "Import statement search",
+      "category": "import_discovery",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [],
+      "should_have_results": true,
+      "why_relevant": "Import statement for csv module"
+    },
+    {
+      "query_id": "q014",
+      "query": "from .reader",
+      "description": "Relative import search",
+      "category": "import_discovery",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/pipeline.py"
+      ],
+      "expected_symbols": [],
+      "should_have_results": true,
+      "why_relevant": "Relative import from .reader module"
+    },
+    {
+      "query_id": "q015",
+      "query": "import sqlite3",
+      "description": "Import statement search",
+      "category": "import_discovery",
+      "repo": "webapp",
+      "expected_files": [
+        "webapp/database.py"
+      ],
+      "expected_symbols": [],
+      "should_have_results": true,
+      "why_relevant": "Import statement for sqlite3 module"
+    },
+    {
+      "query_id": "q016",
+      "query": "transform_data",
+      "description": "Function called across files (pipeline.py calls transformer.py)",
+      "category": "cross_file",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/transformer.py",
+        "dataproc/pipeline.py"
+      ],
+      "expected_symbols": [
+        "transform_data"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Function defined in transformer.py, called from pipeline.py"
+    },
+    {
+      "query_id": "q017",
+      "query": "read_json",
+      "description": "Function called across files (pipeline.py calls reader.py)",
+      "category": "cross_file",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/reader.py",
+        "dataproc/pipeline.py"
+      ],
+      "expected_symbols": [
+        "read_json"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Function defined in reader.py, called from pipeline.py"
+    },
+    {
+      "query_id": "q018",
+      "query": "register_routes",
+      "description": "Function called across files (app.py calls routes.py)",
+      "category": "cross_file",
+      "repo": "webapp",
+      "expected_files": [
+        "webapp/routes.py",
+        "webapp/app.py"
+      ],
+      "expected_symbols": [
+        "register_routes"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Function defined in routes.py, called from app.py"
+    },
+    {
+      "query_id": "q019",
+      "query": "how to add two numbers",
+      "description": "Natural language query for addition function",
+      "category": "natural_language",
+      "repo": "calc",
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [
+        "add"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Natural language description of add function"
+    },
+    {
+      "query_id": "q020",
+      "query": "how to read a CSV file",
+      "description": "Natural language query for CSV reading",
+      "category": "natural_language",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [
+        "read_csv"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Natural language description of read_csv function"
+    },
+    {
+      "query_id": "q021",
+      "query": "how to write JSON data",
+      "description": "Natural language query for JSON writing",
+      "category": "natural_language",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/writer.py"
+      ],
+      "expected_symbols": [
+        "write_json"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Natural language description of write_json function"
+    },
+    {
+      "query_id": "q022",
+      "query": "how to truncate a string",
+      "description": "Natural language query for string truncation",
+      "category": "natural_language",
+      "repo": "utils",
+      "expected_files": [
+        "utils/string_utils.py"
+      ],
+      "expected_symbols": [
+        "truncate"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Natural language description of truncate function"
+    },
+    {
+      "query_id": "q023",
+      "query": "compute sum",
+      "description": "Synonym for 'add' (vocabulary mismatch)",
+      "category": "synonym",
+      "repo": "calc",
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [
+        "add"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Synonym 'compute sum' refers to 'add' function"
+    },
+    {
+      "query_id": "q024",
+      "query": "data transformation",
+      "description": "Synonym for 'transform_data' (vocabulary mismatch)",
+      "category": "synonym",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/transformer.py"
+      ],
+      "expected_symbols": [
+        "transform_data"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Synonym 'data transformation' refers to 'transform_data' function"
+    },
+    {
+      "query_id": "q025",
+      "query": "file reader",
+      "description": "Synonym for 'read_csv' (vocabulary mismatch)",
+      "category": "synonym",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [
+        "read_csv"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Synonym 'file reader' refers to 'read_csv' function"
+    },
+    {
+      "query_id": "q026",
+      "query": "DATABASE_URL",
+      "description": "Configuration constant discovery",
+      "category": "config_discovery",
+      "repo": "webapp",
+      "expected_files": [
+        "webapp/app.py"
+      ],
+      "expected_symbols": [],
+      "should_have_results": true,
+      "why_relevant": "Configuration constant in app.py"
+    },
+    {
+      "query_id": "q027",
+      "query": "SECRET_KEY",
+      "description": "Configuration constant discovery",
+      "category": "config_discovery",
+      "repo": "webapp",
+      "expected_files": [
+        "webapp/app.py"
+      ],
+      "expected_symbols": [],
+      "should_have_results": true,
+      "why_relevant": "Configuration constant in app.py"
+    },
+    {
+      "query_id": "q028",
+      "query": "raise ValueError",
+      "description": "Error handling pattern discovery",
+      "category": "error_handling",
+      "repo": "calc",
+      "expected_files": [
+        "calc/calculator.py",
+        "calc/operations.py"
+      ],
+      "expected_symbols": [],
+      "should_have_results": true,
+      "why_relevant": "Error handling pattern in divide function"
+    },
+    {
+      "query_id": "q029",
+      "query": "if user is None",
+      "description": "Error handling pattern discovery",
+      "category": "error_handling",
+      "repo": "webapp",
+      "expected_files": [
+        "webapp/routes.py"
+      ],
+      "expected_symbols": [],
+      "should_have_results": true,
+      "why_relevant": "Error handling pattern in user_handler"
+    },
+    {
+      "query_id": "q030",
+      "query": "quantum computing",
+      "description": "Query with no matching results",
+      "category": "no_result",
+      "repo": "calc",
+      "expected_files": [],
+      "expected_symbols": [],
+      "should_have_results": false,
+      "why_relevant": "No relevant code in fixture"
+    },
+    {
+      "query_id": "q031",
+      "query": "nonexistent_function_xyz",
+      "description": "Query for nonexistent function",
+      "category": "no_result",
+      "repo": "calc",
+      "expected_files": [],
+      "expected_symbols": [],
+      "should_have_results": false,
+      "why_relevant": "Function does not exist in any fixture"
+    },
+    {
+      "query_id": "q032",
+      "query": "machine learning model",
+      "description": "Query with no matching results",
+      "category": "no_result",
+      "repo": "webapp",
+      "expected_files": [],
+      "expected_symbols": [],
+      "should_have_results": false,
+      "why_relevant": "No ML-related code in fixture"
+    },
+    {
+      "query_id": "q033",
+      "query": "read",
+      "description": "Ambiguous query matching multiple read functions",
+      "category": "ambiguous",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/reader.py"
+      ],
+      "expected_symbols": [
+        "read_csv",
+        "read_json",
+        "read_text"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Ambiguous term matching multiple read functions"
+    },
+    {
+      "query_id": "q034",
+      "query": "write",
+      "description": "Ambiguous query matching multiple write functions",
+      "category": "ambiguous",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/writer.py"
+      ],
+      "expected_symbols": [
+        "write_csv",
+        "write_json",
+        "write_text"
+      ],
+      "should_have_results": true,
+      "why_relevant": "Ambiguous term matching multiple write functions"
+    },
+    {
+      "query_id": "q035",
+      "query": "data",
+      "description": "Highly ambiguous query matching many symbols",
+      "category": "ambiguous",
+      "repo": "dataproc",
+      "expected_files": [
+        "dataproc/transformer.py",
+        "dataproc/writer.py",
+        "dataproc/pipeline.py"
+      ],
+      "expected_symbols": [],
+      "should_have_results": true,
+      "why_relevant": "Highly ambiguous term matching many functions"
+    }
+  ]
+}
