@@ -364,6 +364,17 @@ class IndexStore:
 
     def delete_file(self, file_id: str) -> None:
         conn = self.connect()
+        # Delete embeddings for this file's chunks first. vec0 has no FK
+        # cascade support, so deleting the file row alone would orphan vectors.
+        chunk_rows = conn.execute(
+            "SELECT id FROM chunks WHERE file_id = ?", (file_id,)
+        ).fetchall()
+        if _SQLITE_VEC_AVAILABLE and chunk_rows:
+            for r in chunk_rows:
+                conn.execute(
+                    "DELETE FROM chunk_embeddings WHERE rowid = ?",
+                    (r["id"],),
+                )
         conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
         conn.commit()
 
