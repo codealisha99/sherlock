@@ -384,6 +384,50 @@ def cmd_semantic_search(args) -> int:
     return 0
 
 
+def cmd_hybrid_search(args) -> int:
+    """Hybrid search combining FTS5 lexical and sqlite-vec semantic retrieval."""
+    from app.llm.embedding_client import EmbeddingClient
+
+    indexer = _get_indexer()
+    client = EmbeddingClient()
+    if not client.is_available():
+        print(
+            "[!] Embedding model is not available. Ensure sentence-transformers "
+            "and the configured model are installed.",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        results = indexer.hybrid_search(
+            args.repo_id,
+            args.query,
+            limit=args.limit,
+            rrf_k=args.rrf_k,
+            embedding_client=client,
+        )
+    except ValueError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except RuntimeError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    if not results:
+        print(f"No hybrid results for '{args.query}' in repository {args.repo_id}.")
+        return 0
+    print(f"Hybrid search results for '{args.query}' ({len(results)}):")
+    for r in results:
+        print(
+            f"  {r['file_path']}:{r['start_line']}-{r['end_line']} "
+            f"(rrf_score={r.get('rrf_score', 0.0):.4f}, "
+            f"lex_rank={r.get('lexical_rank') or '-'}, "
+            f"sem_rank={r.get('semantic_rank') or '-'})"
+        )
+        snippet = (r.get("content") or "").strip().splitlines()[0] if r.get("content") else ""
+        if snippet:
+            print(f"    {snippet[:100]}")
+    return 0
+
+
 def cmd_summary(args) -> int:
     """Print a deterministic, evidence-based summary of the indexed repository."""
     indexer = _get_indexer()
@@ -572,6 +616,13 @@ def main():
     p_semantic.add_argument("--query", required=True, help="Natural-language query")
     p_semantic.add_argument("--limit", type=int, default=20, help="Max results")
     p_semantic.set_defaults(func=cmd_semantic_search)
+
+    p_hybrid = sub.add_parser("hybrid-search", help="Hybrid search: FTS5 lexical + sqlite-vec semantic with RRF")
+    p_hybrid.add_argument("--repo-id", required=True, help="Repository id")
+    p_hybrid.add_argument("--query", required=True, help="Natural-language query")
+    p_hybrid.add_argument("--limit", type=int, default=20, help="Max results")
+    p_hybrid.add_argument("--rrf-k", type=int, default=60, help="RRF ranking constant (default 60)")
+    p_hybrid.set_defaults(func=cmd_hybrid_search)
 
     p_summary = sub.add_parser("summary", help="Deterministic repository summary (no LLM)")
     p_summary.add_argument("--repo-id", required=True, help="Repository id")
