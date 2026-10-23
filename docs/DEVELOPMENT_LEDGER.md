@@ -8,4 +8,4 @@ Records each delivery increment: feature/fix, tests, commit hash, push result, r
 |-----------|-------------|-------|-------------|-------------|-----------|
 | 1 | Baseline audit + architecture map | Existing test suite (61 tests pass) | 832d647 (pre-existing) | Pushed (pre-existing) | Normalize lexical results |
 | 2 | Record reproducible test commands | unittest discover -s tests -s evaluation/tests | — | — | Implement RRF |
-| 3 | Normalize lexical + semantic result structures; RRF fusion; dedup; repo scoping; result limits; CLI hybrid-search | tests/test_hybrid_search.py (10 tests pass) | — | — | CLI help verification |
+| 3 | Normalize lexical + semantic result structures; RRF fusion; dedup; repo scoping; result limits; CLI hybrid-search | tests/test_hybrid_search.py (10 tests pass) | 419e2ec | Pushed to origin/main | CLI help verification |
