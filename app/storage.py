@@ -641,6 +641,132 @@ class IndexStore:
         return int(row["c"]) if row else 0
 
     # ------------------------------------------------------------------ #
+    # Hybrid retrieval (RRF)
+    # ------------------------------------------------------------------ #
+    def hybrid_search(
+        self,
+        repo_id: str,
+        query: str,
+        query_embedding: Optional[List[float]] = None,
+        limit: int = 20,
+        rrf_k: int = 60,
+        lexical_limit: int = 50,
+        semantic_limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Hybrid retrieval combining FTS5 lexical search and sqlite-vec
+        semantic search using Reciprocal Rank Fusion (RRF).
+
+        RRF formula: score(d) = sum(1 / (k + rank_i(d)))
+        where rank_i(d) is the 1-based position of document d in result
+        list i, and k is a configurable constant (default 60).
+
+        Parameters
+        ----------
+        repo_id:
+            Repository id to search within.
+        query:
+            Natural-language query string for lexical search.
+        query_embedding:
+            Pre-computed query embedding for semantic search. If None and
+            sqlite-vec is available, semantic results are skipped.
+        limit:
+            Maximum number of fused results to return.
+        rrf_k:
+            RRF ranking constant. Higher values dampen the impact of
+            top-ranked results (default 60).
+        lexical_limit:
+            Maximum lexical candidates to consider before fusion.
+        semantic_limit:
+            Maximum semantic candidates to consider before fusion.
+
+        Returns
+        -------
+        list of dict
+            Each dict contains chunk metadata plus ``lexical_rank``,
+            ``semantic_rank``, ``lexical_score``, ``semantic_score``, and
+            ``rrf_score``. Results are sorted by descending ``rrf_score``.
+
+        Raises
+        ------
+        ValueError
+            If the query is empty or the repository does not exist.
+        RuntimeError
+            If neither lexical nor semantic search can produce results.
+        """
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("hybrid_search() requires a nonempty query string.")
+
+        self.store_connect_check()
+
+        repo = self.get_repository(repo_id)
+        if repo is None:
+            raise ValueError(f"Repository not found: {repo_id}")
+
+        # --- Lexical search (FTS5) ---
+        lexical_results = self.search_chunks(repo_id, query, limit=lexical_limit)
+        # Assign 1-based lexical rank positions.
+        for pos, r in enumerate(lexical_results, start=1):
+            r["lexical_rank"] = pos
+            r["lexical_score"] = r.pop("rank", None)
+
+        # --- Semantic search (sqlite-vec) ---
+        semantic_results: List[Dict[str, Any]] = []
+        if query_embedding is not None and _SQLITE_VEC_AVAILABLE:
+            semantic_results = self.search_chunk_embeddings(
+                repo_id, query_embedding, limit=semantic_limit
+            )
+            for pos, r in enumerate(semantic_results, start=1):
+                r["semantic_rank"] = pos
+                r["semantic_score"] = r.pop("similarity", None)
+                r["semantic_distance"] = r.pop("distance", None)
+
+        # --- RRF fusion with deduplication ---
+        fused: Dict[int, Dict[str, Any]] = {}
+
+        def _add_result(r: Dict[str, Any], rank_key: str, score_key: str):
+            chunk_id = r["id"]
+            if chunk_id not in fused:
+                fused[chunk_id] = {
+                    "id": r["id"],
+                    "file_id": r["file_id"],
+                    "content": r["content"],
+                    "start_line": r["start_line"],
+                    "end_line": r["end_line"],
+                    "chunk_type": r["chunk_type"],
+                    "file_path": r["file_path"],
+                    "lexical_rank": None,
+                    "semantic_rank": None,
+                    "lexical_score": None,
+                    "semantic_score": None,
+                    "semantic_distance": None,
+                    "rrf_score": 0.0,
+                }
+            entry = fused[chunk_id]
+            rank = r.get(rank_key)
+            if rank is not None:
+                entry[rank_key] = rank
+                entry[score_key] = r.get(score_key)
+                # RRF contribution: 1 / (k + rank)
+                entry["rrf_score"] += 1.0 / (rrf_k + rank)
+
+        for r in lexical_results:
+            _add_result(r, "lexical_rank", "lexical_score")
+        for r in semantic_results:
+            _add_result(r, "semantic_rank", "semantic_score")
+
+        # Sort by descending RRF score, then by lexical rank as tiebreaker.
+        ranked = sorted(
+            fused.values(),
+            key=lambda r: (-r["rrf_score"], r["lexical_rank"] or 999999),
+        )
+
+        return ranked[:limit]
+
+    def store_connect_check(self) -> None:
+        """Ensure the store connection is open (helper for hybrid_search)."""
+        self.connect()
+
+    # ------------------------------------------------------------------ #
     # Definitions & imports
     # ------------------------------------------------------------------ #
     def add_definition(

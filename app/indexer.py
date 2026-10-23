@@ -422,6 +422,76 @@ class RepositoryIndexer:
         finally:
             self.store.close()
 
+    def hybrid_search(
+        self,
+        repo_id: str,
+        query: str,
+        limit: int = 20,
+        rrf_k: int = 60,
+        embedding_client: Optional[EmbeddingClient] = None,
+    ) -> List[Dict[str, Any]]:
+        """Hybrid retrieval combining FTS5 lexical and sqlite-vec semantic search.
+
+        Uses Reciprocal Rank Fusion (RRF):
+            score(d) = sum(1 / (k + rank_i(d)))
+        where rank_i(d) is the 1-based position of document d in result
+        list i, and k is the RRF constant (default 60).
+
+        Parameters
+        ----------
+        repo_id:
+            Repository id to search within.
+        query:
+            Natural-language query string. Must be nonempty.
+        limit:
+            Maximum number of fused results to return.
+        rrf_k:
+            RRF ranking constant (default 60).
+        embedding_client:
+            Optional pre-configured :class:`EmbeddingClient`. If omitted,
+            a default client using the global config is created. Semantic
+            results are skipped if no client is available.
+
+        Returns
+        -------
+        list of dict
+            Each dict contains chunk metadata plus ``lexical_rank``,
+            ``semantic_rank``, ``lexical_score``, ``semantic_score``, and
+            ``rrf_score``. Sorted by descending ``rrf_score``.
+
+        Raises
+        ------
+        ValueError
+            If the query is empty or the repository does not exist.
+        RuntimeError
+            If neither lexical nor semantic search can produce results.
+        """
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("hybrid_search() requires a nonempty query string.")
+
+        self.store.connect()
+        try:
+            repo = self.store.get_repository(repo_id)
+            if repo is None:
+                raise ValueError(f"Repository not found: {repo_id}")
+
+            # Embed the query once for semantic search.
+            query_embedding: Optional[List[float]] = None
+            client = embedding_client or EmbeddingClient()
+            if client.is_available():
+                query_embedding = client.embed_text(query)
+
+            results = self.store.hybrid_search(
+                repo_id,
+                query,
+                query_embedding=query_embedding,
+                limit=limit,
+                rrf_k=rrf_k,
+            )
+            return results
+        finally:
+            self.store.close()
+
     # ------------------------------------------------------------------ #
     # Per-file indexing
     # ------------------------------------------------------------------ #
