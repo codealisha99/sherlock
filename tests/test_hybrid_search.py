@@ -193,6 +193,45 @@ class TestHybridSearch(unittest.TestCase):
             self.assertIsInstance(r["start_line"], int)
             self.assertIsInstance(r["end_line"], int)
 
+    # ------------------------------------------------------------------ #
+    # Validation at storage layer
+    # ------------------------------------------------------------------ #
+    def test_storage_invalid_limit(self):
+        """storage.hybrid_search rejects limit < 1."""
+        with self.assertRaises(ValueError) as ctx:
+            self.store.hybrid_search(self.repo_id, "add", limit=0)
+        self.assertIn("limit >= 1", str(ctx.exception))
+
+    def test_storage_negative_limit(self):
+        """storage.hybrid_search rejects negative limit."""
+        with self.assertRaises(ValueError) as ctx:
+            self.store.hybrid_search(self.repo_id, "add", limit=-1)
+        self.assertIn("limit >= 1", str(ctx.exception))
+
+    def test_storage_invalid_rrf_k(self):
+        """storage.hybrid_search rejects rrf_k < 1."""
+        with self.assertRaises(ValueError) as ctx:
+            self.store.hybrid_search(self.repo_id, "add", rrf_k=0)
+        self.assertIn("rrf_k >= 1", str(ctx.exception))
+
+    def test_storage_negative_rrf_k(self):
+        """storage.hybrid_search rejects negative rrf_k."""
+        with self.assertRaises(ValueError) as ctx:
+            self.store.hybrid_search(self.repo_id, "add", rrf_k=-5)
+        self.assertIn("rrf_k >= 1", str(ctx.exception))
+
+    def test_storage_empty_query(self):
+        """storage.hybrid_search rejects empty query."""
+        with self.assertRaises(ValueError) as ctx:
+            self.store.hybrid_search(self.repo_id, "")
+        self.assertIn("nonempty", str(ctx.exception))
+
+    def test_storage_nonexistent_repo(self):
+        """storage.hybrid_search rejects nonexistent repo."""
+        with self.assertRaises(ValueError) as ctx:
+            self.store.hybrid_search("nonexistent", "add")
+        self.assertIn("not found", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
