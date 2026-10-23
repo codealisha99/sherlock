@@ -468,6 +468,10 @@ class RepositoryIndexer:
         """
         if not isinstance(query, str) or not query.strip():
             raise ValueError("hybrid_search() requires a nonempty query string.")
+        if not isinstance(limit, int) or limit < 1:
+            raise ValueError("hybrid_search() requires limit >= 1.")
+        if not isinstance(rrf_k, int) or rrf_k < 1:
+            raise ValueError("hybrid_search() requires rrf_k >= 1.")
 
         self.store.connect()
         try:

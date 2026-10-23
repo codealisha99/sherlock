@@ -397,6 +397,12 @@ def cmd_hybrid_search(args) -> int:
             file=sys.stderr,
         )
         return 1
+    if args.limit < 1:
+        print(f"[!] --limit must be >= 1, got {args.limit}.", file=sys.stderr)
+        return 1
+    if args.rrf_k < 1:
+        print(f"[!] --rrf-k must be >= 1, got {args.rrf_k}.", file=sys.stderr)
+        return 1
     try:
         results = indexer.hybrid_search(
             args.repo_id,
