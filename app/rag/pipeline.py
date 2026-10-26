@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 from app.indexer import RepositoryIndexer
 from app.llm.embedding_client import EmbeddingClient
 from app.llm.ollama_client import OllamaClient
+from app.rag.citation_validator import Citation, validate_citations
 from app.rag.context_builder import (
     ChunkSource,
     ContextBundle,
@@ -28,6 +29,7 @@ from app.rag.context_builder import (
     build_citation_map,
     format_context_for_prompt,
 )
+from app.rag.citation_validator import validate_citations
 
 logger = logging.getLogger(__name__)
 
@@ -35,18 +37,6 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------- #
 # Data structures
 # --------------------------------------------------------------------------- #
-
-
-@dataclass
-class Citation:
-    """A validated citation referencing a retrieved source chunk."""
-
-    source_id: str  # e.g., "S1"
-    file_path: str
-    start_line: int
-    end_line: int
-    chunk_type: str
-    content: str
 
 
 @dataclass
@@ -230,21 +220,16 @@ class RAGPipeline:
     ) -> List[Dict[str, Any]]:
         """Retrieve chunks using the specified method."""
         if retrieval_method == "hybrid":
-            # Embed the query once for semantic search
-            query_embedding = None
-            if self.embedding_client.is_available():
-                query_embedding = self.embedding_client.embed_text(query)
             return self.indexer.hybrid_search(
                 repo_id,
                 query,
-                query_embedding=query_embedding,
                 limit=limit,
                 rrf_k=self.rrf_k,
+                embedding_client=self.embedding_client,
             )
         elif retrieval_method == "semantic":
             if not self.embedding_client.is_available():
                 return []
-            query_embedding = self.embedding_client.embed_text(query)
             return self.indexer.semantic_search(
                 repo_id,
                 query,
@@ -297,40 +282,12 @@ class RAGPipeline:
     ) -> List[Citation]:
         """Validate citations in the answer against the evidence map.
 
-        Extracts [S1]-style citations from the answer text and validates
-        each against the citation map built from trusted metadata.
-        Returns a list of valid Citation objects.
+        Delegates to the deterministic citation validator in
+        app/rag/citation_validator.py, which checks:
+          - Citation format ([S<n>])
+          - Source exists in retrieved evidence
+          - No cross-repository citation leakage
+          - Safe repo-relative file path
+          - Valid line range (start >= 1, end >= start)
         """
-        import re
-
-        # Find all [S1], [S2], etc. citations in the answer
-        citation_pattern = re.compile(r"\[S(\d+)\]")
-        found_ids: List[str] = []
-        for match in citation_pattern.finditer(answer_text):
-            found_ids.append(match.group(1))
-
-        # Deduplicate while preserving order
-        seen: set = set()
-        valid_citations: List[Citation] = []
-        for source_id in found_ids:
-            if source_id in seen:
-                continue
-            seen.add(source_id)
-
-            meta = citation_map.get(f"S{source_id}")
-            if meta is None:
-                # Invalid citation - skip it
-                continue
-
-            valid_citations.append(
-                Citation(
-                    source_id=f"S{source_id}",
-                    file_path=meta["file_path"],
-                    start_line=meta["start_line"],
-                    end_line=meta["end_line"],
-                    chunk_type=meta.get("chunk_type", "code"),
-                    content=meta.get("content", ""),
-                )
-            )
-
-        return valid_citations
+        return validate_citations(answer_text, citation_map)
