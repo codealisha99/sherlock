@@ -386,6 +386,86 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             }, status_code=202)
             return
 
+        # RAG: ask a natural-language question (grounded Q&A)
+        if path == "/api/ask":
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len).decode("utf-8")
+            try:
+                data = json.loads(raw_body)
+            except Exception:
+                self._send_error_json("Invalid JSON payload", 400)
+                return
+
+            repo_id = data.get("repo_id", "").strip()
+            question = data.get("question", "").strip()
+            retrieval_method = data.get("retrieval_method", "hybrid")
+            limit = int(data.get("limit", 10))
+
+            if not repo_id:
+                self._send_error_json("'repo_id' is required", 400)
+                return
+            if not question:
+                self._send_error_json("'question' is required", 400)
+                return
+            if retrieval_method not in ("hybrid", "lexical", "semantic"):
+                self._send_error_json("'retrieval_method' must be 'hybrid', 'lexical', or 'semantic'", 400)
+                return
+            if limit < 1 or limit > 50:
+                self._send_error_json("'limit' must be between 1 and 50", 400)
+                return
+
+            from app.rag.pipeline import RAGPipeline
+
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            indexer.store.connect()
+            try:
+                repo = indexer.store.get_repository(repo_id)
+                if not repo:
+                    self._send_error_json(f"Repository '{repo_id}' not found", 404)
+                    return
+            finally:
+                indexer.store.close()
+
+            try:
+                pipeline = RAGPipeline(indexer=indexer)
+                result = pipeline.ask(
+                    repo_id=repo_id,
+                    question=question,
+                    retrieval_method=retrieval_method,
+                    limit=limit,
+                )
+            except Exception as exc:  # noqa: BLE001 - report pipeline failure
+                logger.error(f"RAG pipeline error: {exc}")
+                self._send_error_json(f"RAG pipeline error: {exc}", 500)
+                return
+
+            citations = [
+                {
+                    "source_id": c.source_id,
+                    "file_path": c.file_path,
+                    "start_line": c.start_line,
+                    "end_line": c.end_line,
+                    "chunk_type": c.chunk_type,
+                }
+                for c in result.citations
+            ]
+
+            self._send_json({
+                "query": result.query,
+                "repo_id": result.repo_id,
+                "answer": result.answer,
+                "abstained": result.abstained,
+                "abstention_reason": result.abstention_reason,
+                "retrieval_method": result.retrieval_method,
+                "num_chunks_retrieved": result.num_chunks_retrieved,
+                "num_chunks_used": result.num_chunks_used,
+                "citations": citations,
+                "generation_error": result.generation_error,
+                "retrieval_error": result.retrieval_error,
+            })
+            return
+
         self._send_error_json("Endpoint not found", 404)
 
     def do_DELETE(self):
