@@ -8,6 +8,8 @@ Main application entrypoint. Supports:
     python -m app.main inspect --repo-id <id> --file src/app.py
     python -m app.main list
     python -m app.main remove --repo-id <id>
+- Grounded question-answering (RAG):
+    python -m app.main ask --repo-id <id> --question "How does authentication work?"
 - Existing Ollama-powered multi-agent analysis (`--analyze`).
 - Existing web server (default, `--serve`).
 
@@ -434,6 +436,58 @@ def cmd_hybrid_search(args) -> int:
     return 0
 
 
+def cmd_ask(args) -> int:
+    """Answer a natural-language question using grounded RAG."""
+    from app.rag.pipeline import RAGPipeline
+
+    indexer = _get_indexer()
+    indexer.store.connect()
+    try:
+        repo = indexer.store.get_repository(args.repo_id)
+        if not repo:
+            print(f"[!] Repository not found: {args.repo_id}", file=sys.stderr)
+            return 1
+    finally:
+        indexer.store.close()
+
+    pipeline = RAGPipeline(indexer=indexer)
+
+    try:
+        result = pipeline.ask(
+            repo_id=args.repo_id,
+            question=args.question,
+            retrieval_method=args.retrieval_method,
+            limit=args.limit,
+        )
+    except Exception as exc:  # noqa: BLE001 - report pipeline failure
+        print(f"[!] RAG pipeline error: {exc}", file=sys.stderr)
+        return 1
+
+    if result.abstained:
+        print(f"[!] Abstained: {result.abstention_reason}")
+        if result.generation_error:
+            print(f"    generation error: {result.generation_error}", file=sys.stderr)
+        if result.retrieval_error:
+            print(f"    retrieval error: {result.retrieval_error}", file=sys.stderr)
+        return 2  # distinct exit code for abstention
+
+    print(f"Answer (repo={args.repo_id}, method={result.retrieval_method}):")
+    print(result.answer)
+    print()
+
+    if result.citations:
+        print(f"Citations ({len(result.citations)}):")
+        for c in result.citations:
+            loc = f"{c.file_path}:{c.start_line}-{c.end_line}" if c.end_line else f"{c.file_path}:{c.start_line}"
+            print(f"  [{c.source_id}] {loc} ({c.chunk_type})")
+    else:
+        print("No citations (answer not grounded in retrieved evidence).")
+
+    print()
+    print(f"Chunks retrieved: {result.num_chunks_retrieved}, used: {result.num_chunks_used}")
+    return 0
+
+
 def cmd_summary(args) -> int:
     """Print a deterministic, evidence-based summary of the indexed repository."""
     indexer = _get_indexer()
@@ -629,6 +683,18 @@ def main():
     p_hybrid.add_argument("--limit", type=int, default=20, help="Max results")
     p_hybrid.add_argument("--rrf-k", type=int, default=60, help="RRF ranking constant (default 60)")
     p_hybrid.set_defaults(func=cmd_hybrid_search)
+
+    p_ask = sub.add_parser("ask", help="Ask a natural-language question using grounded RAG")
+    p_ask.add_argument("--repo-id", required=True, help="Repository id")
+    p_ask.add_argument("--question", required=True, help="Natural-language question")
+    p_ask.add_argument(
+        "--retrieval-method",
+        choices=["hybrid", "lexical", "semantic"],
+        default="hybrid",
+        help="Retrieval strategy (default: hybrid)",
+    )
+    p_ask.add_argument("--limit", type=int, default=10, help="Max chunks to retrieve (default: 10)")
+    p_ask.set_defaults(func=cmd_ask)
 
     p_summary = sub.add_parser("summary", help="Deterministic repository summary (no LLM)")
     p_summary.add_argument("--repo-id", required=True, help="Repository id")

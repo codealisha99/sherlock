@@ -9,9 +9,12 @@ from app.rag.context_builder import (
     ContextBundle,
     assemble_context,
 )
+from app.rag.pipeline import RAGPipeline, RAGResult
 
 __all__ = [
     "ChunkSource",
     "ContextBundle",
     "assemble_context",
+    "RAGPipeline",
+    "RAGResult",
 ]
