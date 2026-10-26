@@ -92,7 +92,9 @@ class _FakeIndexer:
         self.repo_id = repo_id
         self.store = _FakeStore(results, repo_id)
 
-    def hybrid_search(self, repo_id, query, query_embedding=None, limit=10, rrf_k=60):
+    def hybrid_search(self, repo_id, query, limit=10, rrf_k=60, embedding_client=None):
+        if embedding_client is not None:
+            embedding_client.embed_text(query)
         return self.results
 
     def semantic_search(self, repo_id, query, limit=10, embedding_client=None):

@@ -255,6 +255,7 @@ def build_citation_map(bundle: ContextBundle) -> Dict[str, Dict[str, Any]]:
     citation_map: Dict[str, Dict[str, Any]] = {}
     for s in bundle.sources:
         citation_map[s.source_id] = {
+            "repo_id": s.repo_id,
             "file_path": s.file_path,
             "start_line": s.start_line,
             "end_line": s.end_line,
