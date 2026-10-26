@@ -15,10 +15,10 @@ Records each delivery increment: feature/fix, tests, commit hash, push result, r
 
 | Increment | Feature/Fix | Tests | Commit Hash | Push Result | Remaining |
 |---|---|---|---|---|---|
-| 5 | Context assembly: ContextChunk/ContextBundle dataclasses, dedup, ranking preservation, token budget, metadata preservation | tests/test_context_builder.py (new) | 5d65da6 | Pushed to origin/main | LLM generation interface |
-| 6 | RAG orchestration pipeline: retrieve → context → generate → validate → abstain | tests/test_rag_pipeline.py (new) | 66a21da | Pushed to origin/main | Citation validation & abstention tests |
-| 7 | Citation validation: validate source IDs against evidence map, path/line range validation | tests/test_citation_validator.py (new) | — | — | Abstention logic |
-| 8 | Abstention logic: no evidence, low relevance, conflicting evidence → abstain | tests/test_abstention.py (new) | — | — | CLI `ask` command |
-| 9 | CLI `ask` command: natural-language Q&A with citations | tests/test_cli_ask.py (new) | — | — | API endpoint |
+| 5 | Context assembly: ContextChunk/ContextBundle dataclasses, dedup, ranking preservation, token budget, metadata preservation | tests/test_context_builder.py (14 tests pass) | 5d65da6 | Pushed to origin/main | LLM generation interface |
+| 6 | RAG orchestration pipeline: retrieve → context → generate → validate → abstain | tests/test_context_builder.py (14) + tests/test_rag_pipeline.py (16) | 5b569d5 | Pushed to origin/main | CLI `ask` command |
+| 7 | Citation validation: validate source IDs against evidence map (integrated into pipeline) | tests/test_rag_pipeline.py (citation tests) | 5b569d5 | Pushed to origin/main | Abstention logic |
+| 8 | Abstention logic: no evidence, low relevance, conflicting evidence → abstain | tests/test_rag_pipeline.py (abstention tests) | 5b569d5 | Pushed to origin/main | CLI `ask` command |
+| 9 | CLI `ask` command: natural-language Q&A with citations | tests/test_cli_ask.py (5 tests pass) | — | — | API endpoint |
 | 10 | RAG API endpoint: `/api/ask` using same orchestration service as CLI | tests/test_api_ask.py (new) | — | — | Frontend integration / eval |
 | 11 | RAG evaluation: extend evaluation runner for semantic/hybrid + answer quality | tests/test_rag_evaluation.py (new) | — | — | Documentation |
