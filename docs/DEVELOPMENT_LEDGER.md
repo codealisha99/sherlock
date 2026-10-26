@@ -19,6 +19,6 @@ Records each delivery increment: feature/fix, tests, commit hash, push result, r
 | 6 | RAG orchestration pipeline: retrieve → context → generate → validate → abstain | tests/test_context_builder.py (14) + tests/test_rag_pipeline.py (16) | 5b569d5 | Pushed to origin/main | CLI `ask` command |
 | 7 | Citation validation: validate source IDs against evidence map (integrated into pipeline) | tests/test_rag_pipeline.py (citation tests) | 5b569d5 | Pushed to origin/main | Abstention logic |
 | 8 | Abstention logic: no evidence, low relevance, conflicting evidence → abstain | tests/test_rag_pipeline.py (abstention tests) | 5b569d5 | Pushed to origin/main | CLI `ask` command |
-| 9 | CLI `ask` command: natural-language Q&A with citations | tests/test_cli_ask.py (5 tests pass) | — | — | API endpoint |
+| 9 | CLI `ask` command: natural-language Q&A with citations | tests/test_cli_ask.py (5 tests pass) | 953bc51 | Pushed to origin/main | API endpoint |
 | 10 | RAG API endpoint: `/api/ask` using same orchestration service as CLI | tests/test_api_ask.py (new) | — | — | Frontend integration / eval |
 | 11 | RAG evaluation: extend evaluation runner for semantic/hybrid + answer quality | tests/test_rag_evaluation.py (new) | — | — | Documentation |
