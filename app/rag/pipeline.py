@@ -24,6 +24,7 @@ from app.llm.ollama_client import OllamaClient
 from app.rag.context_builder import (
     ChunkSource,
     ContextBundle,
+    assemble_context,
     build_citation_map,
     format_context_for_prompt,
 )
@@ -54,7 +55,7 @@ class RAGResult:
 
     query: str
     repo_id: str
-    answer: str
+    answer: str = ""
     citations: List[Citation] = field(default_factory=list)
     sources: List[ChunkSource] = field(default_factory=list)
     retrieval_method: str = "hybrid"
@@ -161,7 +162,7 @@ class RAGPipeline:
         # 4. Assemble bounded context
         bundle = assemble_context(
             raw_results,
-            query,
+            question,
             max_tokens=self.max_context_tokens,
         )
 
@@ -316,14 +317,14 @@ class RAGPipeline:
                 continue
             seen.add(source_id)
 
-            meta = citation_map.get(source_id)
+            meta = citation_map.get(f"S{source_id}")
             if meta is None:
                 # Invalid citation - skip it
                 continue
 
             valid_citations.append(
                 Citation(
-                    source_id=source_id,
+                    source_id=f"S{source_id}",
                     file_path=meta["file_path"],
                     start_line=meta["start_line"],
                     end_line=meta["end_line"],
