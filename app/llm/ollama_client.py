@@ -119,10 +119,10 @@ class OllamaClient:
                 ) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():
-                        if not line.startswith("data: "):
+                        if not line.strip():
                             continue
                         try:
-                            event = json.loads(line[len("data: ") :])
+                            event = json.loads(line)
                         except json.JSONDecodeError:
                             continue
                         content = event.get("message", {}).get("content", "")

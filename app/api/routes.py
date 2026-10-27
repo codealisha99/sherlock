@@ -553,6 +553,10 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                     pass
                 finally:
                     try:
+                        loop.run_until_complete(gen.aclose())
+                    except Exception:
+                        pass
+                    try:
                         loop.close()
                     except Exception:
                         pass
