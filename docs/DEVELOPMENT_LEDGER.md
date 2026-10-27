@@ -23,3 +23,13 @@ Records each delivery increment: feature/fix, tests, commit hash, push result, r
 | 10 | RAG API endpoint: `/api/ask` using same orchestration service as CLI | tests/test_api_ask.py (7 tests pass) | 3dadedb | Pushed to origin/main | Frontend integration / eval |
 | 11 | RAG evaluation: extend evaluation runner for semantic/hybrid + answer quality | tests/test_rag_evaluation.py (6 tests pass) | 6983aed | Pushed to origin/main | Acceptance tests |
 | 12 | End-to-end acceptance tests for all 7 mandatory acceptance criteria | tests/test_acceptance_e2e.py (34 tests pass) | fd9f242 | Pushed to origin/main | LangSmith integration |
+
+## Milestone: Phase 3 - LangSmith Observability & Evaluation
+
+| Increment | Feature/Fix | Tests | Commit Hash | Push Result | Remaining |
+|---|---|---|---|---|---|
+| 13 | LangSmith dependency + configuration module (opt-in tracing, safe defaults) | — | 1c0c00e | Pushed to origin/main | Tracing instrumentation |
+| 14 | LangSmith tracing instrumentation in RAG pipeline (7 stages, safe metadata) | tests/test_rag_pipeline.py (16) + tests/test_cli_ask.py (5) + tests/test_api_ask.py (7) | 4807a76 | Pushed to origin/main | Deterministic metrics module |
+| 15 | LangSmith deterministic metrics module (retrieval, citation, grounding, abstention, latency) | tests/test_langsmith_metrics.py (new) | — | — | CLI diagnostics command |
+| 16 | CLI `langsmith` diagnostic command + integration tests | tests/test_cli_langsmith.py (new) | — | — | LangSmith evaluation workflow |
+| 17 | LangSmith evaluation dataset + hosted evaluation workflow | tests/test_langsmith_evaluation.py (new) | — | — | Documentation |
