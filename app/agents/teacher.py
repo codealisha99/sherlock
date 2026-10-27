@@ -301,7 +301,7 @@ class TeacherAgent(BaseAgent):
             "    Search[app/tools/code_search.py]\n"
             "  end\n"
             "  subgraph External_Storage [External Services & Storage]\n"
-            "    Ollama[Local Ollama (qwen3-coder:30b)]\n"
+            "    Ollama[\"Local Ollama (qwen3-coder:30b)\"]\n"
             "    Disk[workspace/*.json Artifacts]\n"
             "  end\n"
             "  CLI --> API;\n"
