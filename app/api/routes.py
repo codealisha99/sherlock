@@ -9,9 +9,10 @@ import logging
 import mimetypes
 from pathlib import Path
 import threading
+import asyncio
 from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler
-from typing import Optional
+from typing import Optional, Dict
 
 from config import config
 from app.orchestrator.orchestrator import Orchestrator
@@ -464,6 +465,103 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                 "generation_error": result.generation_error,
                 "retrieval_error": result.retrieval_error,
             })
+            return
+
+        # RAG: ask a natural-language question with streaming (SSE)
+        if path == "/api/ask/stream":
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len).decode("utf-8")
+            try:
+                data = json.loads(raw_body)
+            except Exception:
+                self._send_error_json("Invalid JSON payload", 400)
+                return
+
+            repo_id = data.get("repo_id", "").strip()
+            question = data.get("question", "").strip()
+            retrieval_method = data.get("retrieval_method", "hybrid")
+            limit = int(data.get("limit", 10))
+
+            if not repo_id:
+                self._send_error_json("'repo_id' is required", 400)
+                return
+            if not question:
+                self._send_error_json("'question' is required", 400)
+                return
+            if retrieval_method not in ("hybrid", "lexical", "semantic"):
+                self._send_error_json("'retrieval_method' must be 'hybrid', 'lexical', or 'semantic'", 400)
+                return
+            if limit < 1 or limit > 50:
+                self._send_error_json("'limit' must be between 1 and 50", 400)
+                return
+
+            from app.rag.pipeline import RAGPipeline
+
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            indexer.store.connect()
+            try:
+                repo = indexer.store.get_repository(repo_id)
+                if not repo:
+                    self._send_error_json(f"Repository '{repo_id}' not found", 404)
+                    return
+            finally:
+                indexer.store.close()
+
+            # Set SSE headers
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
+
+            pipeline = RAGPipeline(indexer=indexer)
+
+            def _send_event(event: Dict[str, Any]) -> None:
+                """Send a single SSE event."""
+                try:
+                    data_line = f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                    self.wfile.write(data_line.encode("utf-8"))
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    # Client disconnected - stop streaming
+                    raise
+
+            def _run_stream() -> None:
+                """Run the async streaming generator in a new event loop."""
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    gen = pipeline.ask_stream(
+                        repo_id=repo_id,
+                        question=question,
+                        retrieval_method=retrieval_method,
+                        limit=limit,
+                    )
+                    while True:
+                        try:
+                            event = loop.run_until_complete(gen.__anext__())
+                            _send_event(event)
+                            if event.get("type") in ("done", "error"):
+                                break
+                        except StopAsyncIteration:
+                            break
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    # Client disconnected
+                    pass
+                finally:
+                    try:
+                        loop.close()
+                    except Exception:
+                        pass
+
+            try:
+                _run_stream()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                # Client disconnected during streaming - not an error
+                logger.debug("Client disconnected during streaming")
             return
 
         self._send_error_json("Endpoint not found", 404)
