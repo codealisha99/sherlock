@@ -5,3 +5,4 @@ __pycache__/
 .DS_Store
 workspace/analysis_*
 index/
+results/
