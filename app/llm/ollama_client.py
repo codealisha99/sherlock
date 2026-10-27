@@ -4,10 +4,11 @@ Provides robust interaction with local Ollama instances, JSON schema extraction,
 Pydantic validation, retry/repair mechanics, and graceful offline fallback.
 """
 
+import asyncio
 import json
 import logging
 import re
-from typing import Optional, Type, TypeVar, Any, Dict
+from typing import Optional, Type, TypeVar, Any, Dict, AsyncGenerator
 import httpx
 from pydantic import BaseModel, ValidationError
 
@@ -87,6 +88,62 @@ class OllamaClient:
             ) from e
         except Exception as e:
             logger.error(f"Ollama generation failed: {e}")
+            raise
+
+    async def generate_stream(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        temperature: float = 0.2,
+    ) -> AsyncGenerator[str, None]:
+        """Stream generation call to Ollama, yielding text chunks as they arrive."""
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": True,
+            "options": {
+                "temperature": temperature,
+                "num_ctx": self.cfg.context_window,
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                async with client.stream(
+                    "POST", f"{self.host}/api/chat", json=payload
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data: "):
+                            continue
+                        try:
+                            event = json.loads(line[len("data: ") :])
+                        except json.JSONDecodeError:
+                            continue
+                        content = event.get("message", {}).get("content", "")
+                        if not content:
+                            continue
+                        yield content
+        except httpx.ConnectError as e:
+            logger.error(f"Cannot connect to Ollama at {self.host}: {e}")
+            raise ConnectionError(
+                f"Ollama is unreachable at {self.host}. Ensure 'ollama serve' is running locally."
+            ) from e
+        except (httpx.ReadError, httpx.RemoteProtocolError) as e:
+            logger.error(f"Ollama stream interrupted at {self.host}: {e}")
+            raise ConnectionError(
+                f"Ollama stream was interrupted at {self.host}."
+            ) from e
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Ollama stream failed: HTTP {e.response.status_code}")
+            raise
+        except Exception as e:
+            logger.error(f"Ollama streaming failed: {e}")
             raise
 
     def generate_structured(
