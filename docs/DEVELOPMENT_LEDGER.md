@@ -40,8 +40,8 @@ Records each delivery increment: feature/fix, tests, commit hash, push result, r
 | Increment | Feature/Fix | Tests | Commit Hash | Push Result | Remaining |
 |---|---|---|---|---|---|
 | 19 | Ollama client: async generate_stream() with stream: True | — | 903a552 | Pushed to origin/main | RAG pipeline streaming |
-| 20 | RAG pipeline: ask_stream() generator with stage events + token streaming | tests/test_rag_streaming.py (new) | 42b8556 | Pushed to origin/main | API streaming endpoint |
-| 21 | API: /api/ask/stream SSE endpoint | tests/test_api_stream.py (new) | 42b8556 | Pushed to origin/main | CLI streaming |
-| 22 | CLI: ask --stream flag for incremental output | tests/test_cli_stream.py (new) | 42b8556 | Pushed to origin/main | Frontend streaming UI |
-| 23 | Frontend: streaming RAG Q&A UI with SSE | tests/test_frontend_stream.py (new) | — | — | Benchmarking |
-| 24 | Baseline + post-change benchmark with before/after report | evaluation/streaming_benchmark.py (new) | — | — | Documentation |
+| 20 | RAG pipeline: ask_stream() generator with stage events + token streaming | tests/test_rag_streaming.py (8 tests) | e16ca31 | Pushed to origin/main | API streaming endpoint |
+| 21 | API: /api/ask/stream SSE endpoint | tests/test_api_stream.py (6 tests) | e16ca31 | Pushed to origin/main | CLI streaming |
+| 22 | CLI: ask --stream flag for incremental output | tests/test_cli_stream.py (6 tests) | e16ca31 | Pushed to origin/main | Benchmarking |
+| 23 | Streaming benchmark + baseline with before/after metrics | evaluation/streaming_benchmark.py + evaluation/baseline_benchmark.py | 8381295 | Pushed to origin/main | Documentation |
+| 24 | Frontend: streaming RAG Q&A UI with SSE | — | — | — | Documentation |
