@@ -579,6 +579,45 @@ def cmd_langsmith(args) -> int:
     return 0
 
 
+def cmd_langsmith_eval(args) -> int:
+    """Run the LangSmith RAG evaluation benchmark."""
+    from evaluation.langsmith_runner import run_langsmith_evaluation
+
+    from pathlib import Path
+
+    output_dir = Path(args.output_dir) if args.output_dir else None
+    methods = args.methods.split(",") if args.methods else None
+
+    print("Running Sherlock LangSmith Evaluation")
+    print("======================================")
+    print()
+
+    report = run_langsmith_evaluation(
+        output_dir=output_dir,
+        retrieval_methods=methods,
+    )
+
+    print()
+    print(f"Dataset version:  {report['dataset_version']}")
+    print(f"Examples:         {report['num_examples']}")
+    print(f"LangSmith:        {'enabled' if report['use_langsmith'] else 'disabled (local only)'}")
+    print(f"LLM used:         {report['llm_used']}")
+    print()
+
+    for method in report["retrieval_methods"]:
+        agg = report["aggregates"].get(method, {})
+        print(f"--- {method} ---")
+        print(f"  Examples:      {agg.get('total_examples', 0)}")
+        print(f"  Answered:      {agg.get('answered', 0)}")
+        print(f"  Abstained:     {agg.get('abstained', 0)}")
+        print(f"  Abstention %:  {agg.get('abstention_rate', 0):.4f}")
+        print(f"  Avg latency:   {agg.get('avg_latency_ms', 0)} ms")
+        print()
+
+    print(f"Report written to: {output_dir or 'results/'}")
+    return 0
+
+
 def cmd_summary(args) -> int:
     """Print a deterministic, evidence-based summary of the indexed repository."""
     indexer = _get_indexer()
@@ -793,6 +832,21 @@ def main():
 
     p_langsmith = sub.add_parser("langsmith", help="LangSmith observability diagnostics")
     p_langsmith.set_defaults(func=cmd_langsmith)
+
+    p_langsmith_eval = sub.add_parser(
+        "langsmith-eval",
+        help="Run LangSmith RAG evaluation benchmark",
+    )
+    p_langsmith_eval.add_argument(
+        "--output-dir",
+        help="Output directory for reports (default: results/)",
+    )
+    p_langsmith_eval.add_argument(
+        "--methods",
+        default="hybrid",
+        help="Comma-separated retrieval methods (default: hybrid)",
+    )
+    p_langsmith_eval.set_defaults(func=cmd_langsmith_eval)
 
     # --- Existing Ollama-powered flags (backward compatible) ---
     parser.add_argument("--analyze", "-a", type=str, help="Path to local repository to analyze via Ollama multi-agent pipeline")
