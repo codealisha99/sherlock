@@ -488,6 +488,97 @@ def cmd_ask(args) -> int:
     return 0
 
 
+def cmd_ask(args) -> int:
+    """Answer a natural-language question using grounded RAG."""
+    from app.rag.pipeline import RAGPipeline
+
+    indexer = _get_indexer()
+    indexer.store.connect()
+    try:
+        repo = indexer.store.get_repository(args.repo_id)
+        if not repo:
+            print(f"[!] Repository not found: {args.repo_id}", file=sys.stderr)
+            return 1
+    finally:
+        indexer.store.close()
+
+    pipeline = RAGPipeline(indexer=indexer)
+
+    try:
+        result = pipeline.ask(
+            repo_id=args.repo_id,
+            question=args.question,
+            retrieval_method=args.retrieval_method,
+            limit=args.limit,
+        )
+    except Exception as exc:  # noqa: BLE001 - report pipeline failure
+        print(f"[!] RAG pipeline error: {exc}", file=sys.stderr)
+        return 1
+
+    if result.abstained:
+        print(f"[!] Abstained: {result.abstention_reason}")
+        if result.generation_error:
+            print(f"    generation error: {result.generation_error}", file=sys.stderr)
+        if result.retrieval_error:
+            print(f"    retrieval error: {result.retrieval_error}", file=sys.stderr)
+        return 2  # distinct exit code for abstention
+
+    print(f"Answer (repo={args.repo_id}, method={result.retrieval_method}):")
+    print(result.answer)
+    print()
+
+    if result.citations:
+        print(f"Citations ({len(result.citations)}):")
+        for c in result.citations:
+            loc = f"{c.file_path}:{c.start_line}-{c.end_line}" if c.end_line else f"{c.file_path}:{c.start_line}"
+            print(f"  [{c.source_id}] {loc} ({c.chunk_type})")
+    else:
+        print("No citations (answer not grounded in retrieved evidence).")
+
+    print()
+    print(f"Chunks retrieved: {result.num_chunks_retrieved}, used: {result.num_chunks_used}")
+    return 0
+
+
+def cmd_langsmith(args) -> int:
+    """Display LangSmith observability configuration and diagnostics."""
+    from app.rag.tracing import tracing_diagnostics
+
+    diag = tracing_diagnostics()
+
+    print("LangSmith Observability Diagnostics")
+    print("====================================")
+    print()
+    print(f"SDK installed:       {diag['langsmith_installed']}")
+    print(f"Tracing enabled:     {diag['tracing_enabled']}")
+    print(f"Tracing status:      {diag['tracing_status']}")
+    print(f"Project:             {diag['project']}")
+    print(f"API key configured:  {diag['api_key_configured']}")
+    print(f"Capture I/O:         {diag['capture_io']}")
+    print(f"Redact paths:        {diag['redact_paths']}")
+    print()
+
+    status = diag["tracing_status"]
+    if status == "disabled":
+        print("LangSmith tracing is disabled. Sherlock works without LangSmith.")
+        print("To enable: export LANGSMITH_TRACING=true")
+        print("           export LANGSMITH_API_KEY=your-api-key")
+        print("           export LANGSMITH_PROJECT=sherlock")
+    elif status == "sdk_missing":
+        print("LangSmith SDK is not installed.")
+        print("Install: pip install langsmith")
+    elif status == "credentials_missing":
+        print("Tracing is enabled but LANGSMITH_API_KEY is not set.")
+        print("Set: export LANGSMITH_API_KEY=your-api-key")
+    elif status == "not_ready":
+        print("Tracing is enabled and API key is configured, but tracing may not be ready.")
+        print("Check LANGSMITH_ENDPOINT and network connectivity.")
+    elif status == "enabled":
+        print("LangSmith tracing is enabled and ready.")
+
+    return 0
+
+
 def cmd_summary(args) -> int:
     """Print a deterministic, evidence-based summary of the indexed repository."""
     indexer = _get_indexer()
@@ -699,6 +790,9 @@ def main():
     p_summary = sub.add_parser("summary", help="Deterministic repository summary (no LLM)")
     p_summary.add_argument("--repo-id", required=True, help="Repository id")
     p_summary.set_defaults(func=cmd_summary)
+
+    p_langsmith = sub.add_parser("langsmith", help="LangSmith observability diagnostics")
+    p_langsmith.set_defaults(func=cmd_langsmith)
 
     # --- Existing Ollama-powered flags (backward compatible) ---
     parser.add_argument("--analyze", "-a", type=str, help="Path to local repository to analyze via Ollama multi-agent pipeline")
