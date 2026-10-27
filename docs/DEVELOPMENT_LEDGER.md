@@ -34,3 +34,14 @@ Records each delivery increment: feature/fix, tests, commit hash, push result, r
 | 16 | CLI `langsmith` diagnostic command + integration tests | tests/test_langsmith_integration.py (30 tests pass) | 6acceb6 | Pushed to origin/main | LangSmith evaluation workflow |
 | 17 | LangSmith evaluation dataset + hosted evaluation workflow | tests/test_langsmith_evaluation.py (16 tests pass) | 8bb049e | Pushed to origin/main | CLI eval command |
 | 18 | CLI `langsmith-eval` command for running evaluation benchmark | tests/test_langsmith_evaluation.py (16 tests pass) | 912071d | Pushed to origin/main | Documentation |
+
+## Milestone: Phase 4 - Streaming & Latency Optimization
+
+| Increment | Feature/Fix | Tests | Commit Hash | Push Result | Remaining |
+|---|---|---|---|---|---|
+| 19 | Ollama client: async generate_stream() with stream: True | — | 903a552 | Pushed to origin/main | RAG pipeline streaming |
+| 20 | RAG pipeline: ask_stream() generator with stage events + token streaming | tests/test_rag_streaming.py (new) | — | — | API streaming endpoint |
+| 21 | API: /api/ask/stream SSE endpoint | tests/test_api_stream.py (new) | — | — | CLI streaming |
+| 22 | CLI: ask --stream flag for incremental output | tests/test_cli_stream.py (new) | — | — | Frontend streaming UI |
+| 23 | Frontend: streaming RAG Q&A UI with SSE | tests/test_frontend_stream.py (new) | — | — | Benchmarking |
+| 24 | Baseline + post-change benchmark with before/after report | evaluation/streaming_benchmark.py (new) | — | — | Documentation |
