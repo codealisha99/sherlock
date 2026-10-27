@@ -258,7 +258,7 @@ def unsupported_claim_rate(
     }
 
 
-def abstention_metrics(
+def compute_abstention_metrics(
     abstained: bool,
     answerable: Optional[bool],
     abstention_reason: Optional[str],
@@ -348,7 +348,7 @@ class RAGRequestMetrics:
     retrieval_metrics: Dict[str, Any] = field(default_factory=dict)
     citation_metrics: Dict[str, Any] = field(default_factory=dict)
     answer_metrics: Dict[str, Any] = field(default_factory=dict)
-    abstention_metrics: Dict[str, Any] = field(default_factory=dict)
+    abstention_result: Dict[str, Any] = field(default_factory=dict)
     errors: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -366,7 +366,7 @@ class RAGRequestMetrics:
             **{f"retrieval_{k}": v for k, v in self.retrieval_metrics.items()},
             **{f"citation_{k}": v for k, v in self.citation_metrics.items()},
             **{f"answer_{k}": v for k, v in self.answer_metrics.items()},
-            **{f"abstention_{k}": v for k, v in self.abstention_metrics.items()},
+            **{f"abstention_{k}": v for k, v in self.abstention_result.items()},
             "errors": self.errors,
         }
 
@@ -435,7 +435,7 @@ def compute_request_metrics(
     )
 
     # Abstention metrics
-    abstention_metrics: Dict[str, Any] = abstention_metrics(
+    abstention_result: Dict[str, Any] = compute_abstention_metrics(
         result.abstained, answerable, result.abstention_reason
     )
 
@@ -452,6 +452,6 @@ def compute_request_metrics(
         retrieval_metrics=retrieval_metrics,
         citation_metrics=citation_metrics,
         answer_metrics=answer_metrics,
-        abstention_metrics=abstention_metrics,
+        abstention_result=abstention_result,
         errors=[],
     )
