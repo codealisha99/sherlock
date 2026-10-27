@@ -12,7 +12,7 @@ import threading
 import asyncio
 from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler
-from typing import Optional, Dict
+from typing import Any, Dict, Optional
 
 from config import config
 from app.orchestrator.orchestrator import Orchestrator

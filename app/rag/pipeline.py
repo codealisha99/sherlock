@@ -470,6 +470,7 @@ class RAGPipeline:
                     "num_chunks_retrieved": 0,
                     "num_chunks_used": 0,
                     "total_ms": round((time.monotonic() - t0) * 1000, 2),
+                    "elapsed_ms": round((time.monotonic() - t0) * 1000, 2),
                 }
                 metadata.abstained = True
                 metadata.abstention_reason = "No relevant content found"
@@ -630,6 +631,7 @@ class RAGPipeline:
                     "num_chunks_retrieved": result_num_retrieved,
                     "num_chunks_used": len(bundle.sources),
                     "total_ms": round((time.monotonic() - t0) * 1000, 2),
+                    "elapsed_ms": round((time.monotonic() - t0) * 1000, 2),
                 }
                 metadata.abstained = True
                 metadata.abstention_reason = "Empty answer"
@@ -698,6 +700,7 @@ class RAGPipeline:
                     "num_chunks_retrieved": result_num_retrieved,
                     "num_chunks_used": len(bundle.sources),
                     "total_ms": round((time.monotonic() - t0) * 1000, 2),
+                    "elapsed_ms": round((time.monotonic() - t0) * 1000, 2),
                 }
                 metadata.abstained = True
                 metadata.abstention_reason = "No citations validated"
@@ -719,6 +722,7 @@ class RAGPipeline:
                 "num_chunks_used": len(bundle.sources),
                 "retrieval_method": retrieval_method,
                 "total_ms": round((time.monotonic() - t0) * 1000, 2),
+                "elapsed_ms": round((time.monotonic() - t0) * 1000, 2),
                 "retrieval_latency_ms": round(retrieval_latency_ms, 2),
                 "generation_latency_ms": round(generation_latency_ms, 2),
                 "assembly_latency_ms": round(assembly_latency_ms, 2),
