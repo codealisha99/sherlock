@@ -31,5 +31,5 @@ Records each delivery increment: feature/fix, tests, commit hash, push result, r
 | 13 | LangSmith dependency + configuration module (opt-in tracing, safe defaults) | — | 1c0c00e | Pushed to origin/main | Tracing instrumentation |
 | 14 | LangSmith tracing instrumentation in RAG pipeline (7 stages, safe metadata) | tests/test_rag_pipeline.py (16) + tests/test_cli_ask.py (5) + tests/test_api_ask.py (7) | 4807a76 | Pushed to origin/main | Deterministic metrics module |
 | 15 | LangSmith deterministic metrics module (retrieval, citation, grounding, abstention, latency) | tests/test_langsmith_metrics.py (26 tests pass) | a5e5ecd | Pushed to origin/main | CLI diagnostics command |
-| 16 | CLI `langsmith` diagnostic command + integration tests | tests/test_cli_langsmith.py (new) | cc93950 | Pushed to origin/main | LangSmith integration tests |
+| 16 | CLI `langsmith` diagnostic command + integration tests | tests/test_langsmith_integration.py (30 tests pass) | 6acceb6 | Pushed to origin/main | LangSmith evaluation workflow |
 | 17 | LangSmith evaluation dataset + hosted evaluation workflow | tests/test_langsmith_evaluation.py (new) | — | — | Documentation |
