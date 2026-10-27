@@ -452,6 +452,9 @@ def cmd_ask(args) -> int:
 
     pipeline = RAGPipeline(indexer=indexer)
 
+    if args.stream:
+        return _cmd_ask_stream(pipeline, args)
+
     try:
         result = pipeline.ask(
             repo_id=args.repo_id,
@@ -488,56 +491,93 @@ def cmd_ask(args) -> int:
     return 0
 
 
-def cmd_ask(args) -> int:
-    """Answer a natural-language question using grounded RAG."""
-    from app.rag.pipeline import RAGPipeline
+def _cmd_ask_stream(pipeline: "RAGPipeline", args) -> int:
+    """Stream answer chunks incrementally via the CLI."""
+    import asyncio
 
-    indexer = _get_indexer()
-    indexer.store.connect()
+    async def _run():
+        accumulated = ""
+        citations = []
+        num_chunks_retrieved = 0
+        num_chunks_used = 0
+        abstained = False
+        abstention_reason = None
+        total_ms = 0
+        gen = pipeline.ask_stream(
+            repo_id=args.repo_id,
+            question=args.question,
+            retrieval_method=args.retrieval_method,
+            limit=args.limit,
+        )
+
+        try:
+            while True:
+                try:
+                    event = await gen.__anext__()
+                except StopAsyncIteration:
+                    break
+
+                etype = event.get("type")
+
+                if etype == "progress":
+                    stage = event.get("stage", "unknown")
+                    msg = event.get("message", "")
+                    elapsed = event.get("elapsed_ms", 0)
+                    # Print progress to stderr so it doesn't mix with answer text
+                    print(f"  [{stage}] {msg} ({elapsed}ms)", file=sys.stderr)
+
+                    if stage == "retrieval_complete":
+                        num_chunks_retrieved = event.get("num_chunks", 0)
+                    elif stage == "context_assembly_complete":
+                        num_chunks_used = event.get("num_chunks", 0)
+
+                elif etype == "token":
+                    # Print answer chunk to stdout immediately, flushing
+                    text = event.get("text", "")
+                    accumulated += text
+                    print(text, end="", flush=True)
+
+                elif etype == "done":
+                    abstained = event.get("abstained", False)
+                    abstention_reason = event.get("abstention_reason")
+                    citations = event.get("citations", [])
+                    num_chunks_retrieved = event.get("num_chunks_retrieved", num_chunks_retrieved)
+                    num_chunks_used = event.get("num_chunks_used", num_chunks_used)
+                    total_ms = event.get("total_ms", 0)
+                    break
+
+                elif etype == "error":
+                    print(f"\n[!] Error at {event.get('stage', 'unknown')}: {event.get('message', '')}", file=sys.stderr)
+                    return 1
+        finally:
+            # Properly close the async generator to avoid "Task destroyed" warnings
+            try:
+                await gen.aclose()
+            except Exception:
+                pass
+
+        print()  # newline after streamed answer
+        print(f"\nStreamed in {total_ms:.0f}ms", file=sys.stderr)
+
+        if abstained:
+            print(f"[!] Abstained: {abstention_reason}", file=sys.stderr)
+            return 2
+
+        if citations:
+            print(f"Citations ({len(citations)}):", file=sys.stderr)
+            for c in citations:
+                loc = f"{c['file_path']}:{c['start_line']}-{c['end_line']}" if c.get('end_line') else f"{c['file_path']}:{c['start_line']}"
+                print(f"  [{c['source_id']}] {loc} ({c.get('chunk_type', 'code')})", file=sys.stderr)
+
+        print(f"Chunks retrieved: {num_chunks_retrieved}, used: {num_chunks_used}", file=sys.stderr)
+        return 0
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
-        repo = indexer.store.get_repository(args.repo_id)
-        if not repo:
-            print(f"[!] Repository not found: {args.repo_id}", file=sys.stderr)
-            return 1
+        return loop.run_until_complete(_run())
     finally:
-        indexer.store.close()
-
-    pipeline = RAGPipeline(indexer=indexer)
-
-    try:
-        result = pipeline.ask(
-            repo_id=args.repo_id,
-            question=args.question,
-            retrieval_method=args.retrieval_method,
-            limit=args.limit,
-        )
-    except Exception as exc:  # noqa: BLE001 - report pipeline failure
-        print(f"[!] RAG pipeline error: {exc}", file=sys.stderr)
-        return 1
-
-    if result.abstained:
-        print(f"[!] Abstained: {result.abstention_reason}")
-        if result.generation_error:
-            print(f"    generation error: {result.generation_error}", file=sys.stderr)
-        if result.retrieval_error:
-            print(f"    retrieval error: {result.retrieval_error}", file=sys.stderr)
-        return 2  # distinct exit code for abstention
-
-    print(f"Answer (repo={args.repo_id}, method={result.retrieval_method}):")
-    print(result.answer)
-    print()
-
-    if result.citations:
-        print(f"Citations ({len(result.citations)}):")
-        for c in result.citations:
-            loc = f"{c.file_path}:{c.start_line}-{c.end_line}" if c.end_line else f"{c.file_path}:{c.start_line}"
-            print(f"  [{c.source_id}] {loc} ({c.chunk_type})")
-    else:
-        print("No citations (answer not grounded in retrieved evidence).")
-
-    print()
-    print(f"Chunks retrieved: {result.num_chunks_retrieved}, used: {result.num_chunks_used}")
-    return 0
+        loop.close()
 
 
 def cmd_langsmith(args) -> int:
@@ -824,6 +864,11 @@ def main():
         help="Retrieval strategy (default: hybrid)",
     )
     p_ask.add_argument("--limit", type=int, default=10, help="Max chunks to retrieve (default: 10)")
+    p_ask.add_argument(
+        "--stream",
+        action="store_true",
+        help="Stream answer chunks incrementally as they are generated",
+    )
     p_ask.set_defaults(func=cmd_ask)
 
     p_summary = sub.add_parser("summary", help="Deterministic repository summary (no LLM)")
