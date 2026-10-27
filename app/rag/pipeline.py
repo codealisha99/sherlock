@@ -15,21 +15,23 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from app.indexer import RepositoryIndexer
 from app.llm.embedding_client import EmbeddingClient
 from app.llm.ollama_client import OllamaClient
-from app.rag.citation_validator import Citation, validate_citations
+from app.rag.citation_validator import Citation, extract_citation_ids, validate_citations
 from app.rag.context_builder import (
     ChunkSource,
     ContextBundle,
     assemble_context,
     build_citation_map,
+    count_tokens,
     format_context_for_prompt,
 )
-from app.rag.citation_validator import validate_citations
+from app.rag.tracing import RAGTraceMetadata, RAGTracer, get_tracer
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +76,7 @@ class RAGPipeline:
         indexer: RepositoryIndexer,
         embedding_client: Optional[EmbeddingClient] = None,
         ollama_client: Optional[OllamaClient] = None,
+        tracer: Optional[RAGTracer] = None,
         max_context_tokens: int = 4000,
         max_chunks: int = 10,
         rrf_k: int = 60,
@@ -82,6 +85,7 @@ class RAGPipeline:
         self.store = indexer.store
         self.embedding_client = embedding_client or EmbeddingClient()
         self.ollama_client = ollama_client or OllamaClient()
+        self.tracer = tracer or get_tracer()
         self.max_context_tokens = max_context_tokens
         self.max_chunks = max_chunks
         self.rrf_k = rrf_k
@@ -117,95 +121,201 @@ class RAGPipeline:
         """
         result = RAGResult(query=question, repo_id=repo_id)
 
-        # 1. Validate question
-        if not isinstance(question, str) or not question.strip():
-            result.abstained = True
-            result.abstention_reason = "Question is empty or missing."
-            return result
-
-        # 2. Validate repository exists
-        repo = self.store.get_repository(repo_id)
-        if repo is None:
-            result.abstained = True
-            result.abstention_reason = f"Repository '{repo_id}' not found."
-            return result
-
-        # 3. Retrieve candidates
-        try:
-            raw_results = self._retrieve(repo_id, question, retrieval_method, limit)
-            result.num_chunks_retrieved = len(raw_results)
-        except Exception as exc:  # noqa: BLE001 - report retrieval failure
-            logger.warning("Retrieval failed for repo %s: %s", repo_id, exc)
-            result.retrieval_error = str(exc)
-            result.abstained = True
-            result.abstention_reason = f"Retrieval failed: {exc}"
-            return result
-
-        if not raw_results:
-            result.abstained = True
-            result.abstention_reason = (
-                "No relevant content found in the indexed repository. "
-                "Try reindexing or asking a more specific question."
-            )
-            return result
-
-        # 4. Assemble bounded context
-        bundle = assemble_context(
-            raw_results,
-            question,
-            max_tokens=self.max_context_tokens,
+        # Start LangSmith trace (opt-in, no-op when disabled)
+        tracer = self.tracer
+        request_id = tracer.start_trace(
+            repo_id=repo_id,
+            retrieval_method=retrieval_method,
+            limit=limit,
         )
 
-        if bundle.budget_exceeded:
-            result.abstained = True
-            result.abstention_reason = (
-                "The most relevant chunk alone exceeds the context budget. "
-                "Try a more specific question."
-            )
-            return result
-
-        if not bundle.sources:
-            result.abstained = True
-            result.abstention_reason = "No usable content could be assembled."
-            return result
-
-        result.num_chunks_used = len(bundle.sources)
-
-        # 5. Generate answer using Ollama
-        context_text = format_context_for_prompt(bundle)
-        citation_map = build_citation_map(bundle)
+        metadata = RAGTraceMetadata(
+            request_id=request_id,
+            repo_id=repo_id,
+            retrieval_method=retrieval_method,
+            limit=limit,
+        )
 
         try:
-            answer_text = self._generate_answer(question, context_text)
-        except Exception as exc:  # noqa: BLE001 - report generation failure
-            logger.warning("Generation failed for repo %s: %s", repo_id, exc)
-            result.generation_error = str(exc)
-            result.abstained = True
-            result.abstention_reason = f"Answer generation failed: {exc}"
-            return result
+            # ------------------------------------------------------------------ #
+            # Stage 1: Request validation
+            # ------------------------------------------------------------------ #
+            with tracer.trace_stage("validation"):
+                if not isinstance(question, str) or not question.strip():
+                    result.abstained = True
+                    result.abstention_reason = "Question is empty or missing."
+                    metadata.abstained = True
+                    metadata.abstention_reason = result.abstention_reason
+                    metadata.failure_stage = "validation"
+                    tracer.end_trace(metadata)
+                    return result
 
-        if not answer_text or not answer_text.strip():
-            result.abstained = True
-            result.abstention_reason = "The model returned an empty answer."
-            return result
+                repo = self.store.get_repository(repo_id)
+                if repo is None:
+                    result.abstained = True
+                    result.abstention_reason = f"Repository '{repo_id}' not found."
+                    metadata.abstained = True
+                    metadata.abstention_reason = result.abstention_reason
+                    metadata.failure_stage = "validation"
+                    tracer.end_trace(metadata)
+                    return result
 
-        result.answer = answer_text.strip()
+            # ------------------------------------------------------------------ #
+            # Stage 2: Retrieval
+            # ------------------------------------------------------------------ #
+            retrieval_start = time.monotonic()
+            try:
+                raw_results = self._retrieve(repo_id, question, retrieval_method, limit)
+                result.num_chunks_retrieved = len(raw_results)
+                metadata.num_chunks_retrieved = len(raw_results)
+            except Exception as exc:  # noqa: BLE001 - report retrieval failure
+                logger.warning("Retrieval failed for repo %s: %s", repo_id, exc)
+                result.retrieval_error = str(exc)
+                metadata.retrieval_error = str(exc)
+                metadata.failure_stage = "retrieval"
+                tracer.end_trace(metadata)
+                result.abstained = True
+                result.abstention_reason = f"Retrieval failed: {exc}"
+                return result
 
-        # 6. Validate citations against evidence
-        citations = self._validate_citations(answer_text, citation_map)
-        result.citations = citations
+            retrieval_latency_ms = (time.monotonic() - retrieval_start) * 1000
+            metadata.retrieval_latency_ms = round(retrieval_latency_ms, 2)
 
-        # 7. Check if any citations survived validation
-        if not citations and result.answer:
-            # The model made claims but none could be validated
-            result.abstained = True
-            result.abstention_reason = (
-                "The generated answer could not be grounded in the "
-                "retrieved evidence. No citations validated."
+            if not raw_results:
+                result.abstained = True
+                result.abstention_reason = (
+                    "No relevant content found in the indexed repository. "
+                    "Try reindexing or asking a more specific question."
+                )
+                metadata.abstained = True
+                metadata.abstention_reason = result.abstention_reason
+                metadata.failure_stage = "retrieval"
+                tracer.end_trace(metadata)
+                return result
+
+            # ------------------------------------------------------------------ #
+            # Stage 3: Context assembly
+            # ------------------------------------------------------------------ #
+            assembly_start = time.monotonic()
+            try:
+                bundle = assemble_context(
+                    raw_results,
+                    question,
+                    max_tokens=self.max_context_tokens,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Context assembly failed: %s", exc)
+                result.abstained = True
+                result.abstention_reason = f"Context assembly failed: {exc}"
+                metadata.abstained = True
+                metadata.abstention_reason = result.abstention_reason
+                metadata.failure_stage = "context_assembly"
+                tracer.end_trace(metadata)
+                return result
+
+            assembly_latency_ms = (time.monotonic() - assembly_start) * 1000
+            metadata.assembly_latency_ms = round(assembly_latency_ms, 2)
+            metadata.context_tokens = bundle.total_tokens
+
+            if bundle.budget_exceeded:
+                result.abstained = True
+                result.abstention_reason = (
+                    "The most relevant chunk alone exceeds the context budget. "
+                    "Try a more specific question."
+                )
+                metadata.abstained = True
+                metadata.abstention_reason = result.abstention_reason
+                metadata.failure_stage = "context_assembly"
+                tracer.end_trace(metadata)
+                return result
+
+            if not bundle.sources:
+                result.abstained = True
+                result.abstention_reason = "No usable content could be assembled."
+                metadata.abstained = True
+                metadata.abstention_reason = result.abstention_reason
+                metadata.failure_stage = "context_assembly"
+                tracer.end_trace(metadata)
+                return result
+
+            result.num_chunks_used = len(bundle.sources)
+            metadata.num_chunks_used = len(bundle.sources)
+
+            # ------------------------------------------------------------------ #
+            # Stage 4: Ollama generation
+            # ------------------------------------------------------------------ #
+            context_text = format_context_for_prompt(bundle)
+            citation_map = build_citation_map(bundle)
+
+            generation_start = time.monotonic()
+            try:
+                answer_text = self._generate_answer(question, context_text)
+            except Exception as exc:  # noqa: BLE001 - report generation failure
+                logger.warning("Generation failed for repo %s: %s", repo_id, exc)
+                result.generation_error = str(exc)
+                metadata.generation_error = str(exc)
+                metadata.failure_stage = "generation"
+                tracer.end_trace(metadata)
+                result.abstained = True
+                result.abstention_reason = f"Answer generation failed: {exc}"
+                return result
+
+            generation_latency_ms = (time.monotonic() - generation_start) * 1000
+            metadata.generation_latency_ms = round(generation_latency_ms, 2)
+            metadata.model_name = getattr(self.ollama_client, "model", None)
+
+            if not answer_text or not answer_text.strip():
+                result.abstained = True
+                result.abstention_reason = "The model returned an empty answer."
+                metadata.abstained = True
+                metadata.abstention_reason = result.abstention_reason
+                metadata.failure_stage = "generation"
+                tracer.end_trace(metadata)
+                return result
+
+            result.answer = answer_text.strip()
+
+            # ------------------------------------------------------------------ #
+            # Stage 5: Citation validation
+            # ------------------------------------------------------------------ #
+            citation_start = time.monotonic()
+            citations = self._validate_citations(answer_text, citation_map)
+            citation_latency_ms = (time.monotonic() - citation_start) * 1000
+            metadata.citation_validation_latency_ms = round(citation_latency_ms, 2)
+            result.citations = citations
+            metadata.citations_valid = len(citations)
+            metadata.citations_total = len(
+                extract_citation_ids(answer_text)
             )
+
+            # ------------------------------------------------------------------ #
+            # Stage 6 & 7: Grounding / abstention + final response
+            # ------------------------------------------------------------------ #
+            if not citations and result.answer:
+                # The model made claims but none could be validated
+                result.abstained = True
+                result.abstention_reason = (
+                    "The generated answer could not be grounded in the "
+                    "retrieved evidence. No citations validated."
+                )
+                metadata.abstained = True
+                metadata.abstention_reason = result.abstention_reason
+                metadata.failure_stage = "grounding"
+                tracer.end_trace(metadata)
+                return result
+
+            metadata.abstained = result.abstained
+            metadata.abstention_reason = result.abstention_reason
+            tracer.end_trace(metadata)
             return result
 
-        return result
+        except Exception as exc:  # noqa: BLE001 - unexpected failure
+            logger.exception("Unexpected RAG pipeline error: %s", exc)
+            result.abstained = True
+            result.abstention_reason = f"Unexpected error: {exc}"
+            metadata.failure_stage = "unexpected"
+            tracer.end_trace(metadata)
+            return result
 
     # ------------------------------------------------------------------ #
     # Internal methods

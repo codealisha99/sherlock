@@ -22,4 +22,4 @@ Records each delivery increment: feature/fix, tests, commit hash, push result, r
 | 9 | CLI `ask` command: natural-language Q&A with citations | tests/test_cli_ask.py (5 tests pass) | 953bc51 | Pushed to origin/main | API endpoint |
 | 10 | RAG API endpoint: `/api/ask` using same orchestration service as CLI | tests/test_api_ask.py (7 tests pass) | 3dadedb | Pushed to origin/main | Frontend integration / eval |
 | 11 | RAG evaluation: extend evaluation runner for semantic/hybrid + answer quality | tests/test_rag_evaluation.py (6 tests pass) | 6983aed | Pushed to origin/main | Acceptance tests |
-| 12 | End-to-end acceptance tests for all 7 mandatory acceptance criteria | tests/test_acceptance_e2e.py (34 tests pass) | fd9f242 | Pushed to origin/main | Frontend integration |
+| 12 | End-to-end acceptance tests for all 7 mandatory acceptance criteria | tests/test_acceptance_e2e.py (34 tests pass) | fd9f242 | Pushed to origin/main | LangSmith integration |
