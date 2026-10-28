@@ -49,6 +49,7 @@ class DataIntegrationAnalystAgent(BaseAgent):
             schema_class=DataIntegrationAnalysis,
             fallback_factory=self._synthesize_data_integrations,
             ctx=ctx,
+            empty_fields=["data_flows"],
         )
 
         ctx.data_integration_analysis = result

@@ -20,6 +20,8 @@ class _Args:
 
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
+        # Default stream to False for backward compatibility
+        self.stream = self.__dict__.get("stream", False)
 
 
 class _FakeRepo:

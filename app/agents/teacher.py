@@ -54,6 +54,7 @@ class TeacherAgent(BaseAgent):
             schema_class=TeachingReport,
             fallback_factory=self._synthesize_teaching,
             ctx=ctx,
+            empty_fields=["answers_to_25_questions"],
         )
 
         ctx.teaching_report = teaching_report

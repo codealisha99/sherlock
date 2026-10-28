@@ -44,6 +44,7 @@ class ComponentAnalystAgent(BaseAgent):
             schema_class=ComponentAnalysis,
             fallback_factory=self._synthesize_components,
             ctx=ctx,
+            empty_fields=["components"],
         )
 
         ctx.component_analysis = result

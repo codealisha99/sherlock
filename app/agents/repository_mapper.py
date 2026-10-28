@@ -49,6 +49,7 @@ class RepositoryMapperAgent(BaseAgent):
             schema_class=RepositoryMap,
             fallback_factory=self._synthesize_from_index,
             ctx=ctx,
+            empty_fields=["major_components"],
         )
 
         ctx.repository_map = result
