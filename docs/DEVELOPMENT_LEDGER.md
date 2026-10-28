@@ -44,4 +44,6 @@ Records each delivery increment: feature/fix, tests, commit hash, push result, r
 | 21 | API: /api/ask/stream SSE endpoint | tests/test_api_stream.py (6 tests) | e16ca31 | Pushed to origin/main | CLI streaming |
 | 22 | CLI: ask --stream flag for incremental output | tests/test_cli_stream.py (6 tests) | e16ca31 | Pushed to origin/main | Benchmarking |
 | 23 | Streaming benchmark + baseline with before/after metrics | evaluation/streaming_benchmark.py + evaluation/baseline_benchmark.py | 8381295 | Pushed to origin/main | Documentation |
-| 24 | Frontend: streaming RAG Q&A UI with SSE | — | — | — | Documentation |
+| 24 | Frontend: streaming RAG Q&A UI with SSE | — | — | — | — |
+| 25 | Fix Mermaid diagram colon syntax error in teacher.py | tests/test_agents.py (existing teacher diagram test) | c0fb3a3 | Pushed to origin/main | Mermaid regression + grounding tests + frontend fallback |
+| 26 | Add Mermaid regression tests, grounding tests, frontend fallback | tests/test_mermaid_validation.py (new) | — | — | Frontend fallback + docs |

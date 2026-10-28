@@ -43,6 +43,7 @@ class GapAnalystAgent(BaseAgent):
             schema_class=GapAnalysis,
             fallback_factory=self._synthesize_gaps,
             ctx=ctx,
+            empty_fields=["gaps"],
         )
 
         ctx.gap_analysis = result

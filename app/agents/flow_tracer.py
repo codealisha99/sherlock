@@ -42,6 +42,7 @@ class FlowTracerAgent(BaseAgent):
             schema_class=FlowAnalysis,
             fallback_factory=self._synthesize_flows,
             ctx=ctx,
+            empty_fields=["key_flows"],
         )
 
         ctx.flow_analysis = result
