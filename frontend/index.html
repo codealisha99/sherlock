@@ -209,6 +209,43 @@
     </div>
   </div>
 
+
+<!-- Sherlock Chat Widget -->
+<div id="chat-widget" class="chat-widget">
+  <div id="chat-bubble" class="chat-bubble" title="Ask Sherlock">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+  </div>
+  
+  <div id="chat-panel" class="chat-panel hidden">
+    <div class="chat-header">
+      <div class="chat-header-left">
+        <span id="chat-session-title">New Chat</span>
+        <span id="chat-badge" class="chat-badge">●</span>
+      </div>
+      <div class="chat-header-right">
+        <button id="chat-new-chat" class="chat-btn-icon" title="New Chat">+</button>
+        <button id="chat-close" class="chat-btn-icon" title="Close">&times;</button>
+      </div>
+    </div>
+    
+    <div id="chat-messages" class="chat-messages">
+      <div class="chat-empty">
+        <p>Start a conversation about your codebase</p>
+      </div>
+    </div>
+    
+    <div class="chat-input-area">
+      <div class="chat-input-wrapper">
+        <input id="chat-input" type="text" placeholder="Ask a question about your code..." />
+        <button id="chat-send" class="chat-btn-send" title="Send">➤</button>
+      </div>
+      <div class="chat-status" id="chat-status"></div>
+    </div>
+  </div>
+</div>
+
   <script src="/app.js"></script>
 </body>
 </html>
