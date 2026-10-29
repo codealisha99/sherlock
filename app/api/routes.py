@@ -575,7 +575,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             def _send_event(event: Dict[str, Any]) -> None:
                 """Send a single SSE event."""
                 try:
-                    data_line = f"data: {json.dumps(event, ensure_ascii=False)}\\n\\n"
+                    data_line = f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
                     self.wfile.write(data_line.encode("utf-8"))
                     self.wfile.flush()
                 except (BrokenPipeError, ConnectionResetError, OSError):
