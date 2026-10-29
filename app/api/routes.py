@@ -284,6 +284,22 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                 self._send_error_json(str(e), 400)
             return
 
+        # 6. Chat: list sessions for a repo
+        if path == "/api/chat/sessions":
+            repo_id = query.get("repo_id", [None])[0]
+            if not repo_id:
+                self._send_error_json("'repo_id' is required", 400)
+                return
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            indexer.store.connect()
+            try:
+                sessions = indexer.store.list_chat_sessions(repo_id)
+            finally:
+                indexer.store.close()
+            self._send_json({"sessions": sessions, "count": len(sessions)})
+            return
+
         # 6. Static files / Frontend Single Page Application
         self._serve_static(path)
 
@@ -385,6 +401,41 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                 "project_path": str(project_path),
                 "note": "Indexing runs in the background. Poll GET /api/index/repos for status.",
             }, status_code=202)
+            return
+
+        # Chat: create a new session
+        if path == "/api/chat/sessions":
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len).decode("utf-8")
+            try:
+                data = json.loads(raw_body)
+            except Exception:
+                self._send_error_json("Invalid JSON payload", 400)
+                return
+
+            repo_id = data.get("repo_id", "").strip()
+            title = data.get("title", "").strip() or None
+            if not repo_id:
+                self._send_error_json("'repo_id' is required", 400)
+                return
+
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            indexer.store.connect()
+            try:
+                repo = indexer.store.get_repository(repo_id)
+                if not repo:
+                    self._send_error_json(f"Repository '{repo_id}' not found", 404)
+                    return
+            finally:
+                indexer.store.close()
+
+            session_id = indexer.store.create_chat_session(repo_id, title=title)
+            self._send_json({
+                "session_id": session_id,
+                "repo_id": repo_id,
+                "title": title or "New Chat",
+            }, status_code=201)
             return
 
         # RAG: ask a natural-language question (grounded Q&A)
@@ -522,7 +573,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             def _send_event(event: Dict[str, Any]) -> None:
                 """Send a single SSE event."""
                 try:
-                    data_line = f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                    data_line = f"data: {json.dumps(event, ensure_ascii=False)}\\n\\n"
                     self.wfile.write(data_line.encode("utf-8"))
                     self.wfile.flush()
                 except (BrokenPipeError, ConnectionResetError, OSError):
@@ -565,6 +616,123 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                 _run_stream()
             except (BrokenPipeError, ConnectionResetError, OSError):
                 # Client disconnected during streaming - not an error
+                logger.debug("Client disconnected during streaming")
+            return
+
+        # Chat: send a message with streaming (SSE)
+        if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
+            parts = path.strip("/").split("/")
+            # /api/chat/sessions/{id}/messages
+            session_id = parts[3]
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len).decode("utf-8")
+            try:
+                data = json.loads(raw_body)
+            except Exception:
+                self._send_error_json("Invalid JSON payload", 400)
+                return
+
+            question = data.get("question", "").strip()
+            retrieval_method = data.get("retrieval_method", "hybrid")
+            limit = int(data.get("limit", 10))
+
+            if not question:
+                self._send_error_json("'question' is required", 400)
+                return
+            if retrieval_method not in ("hybrid", "lexical", "semantic"):
+                self._send_error_json("'retrieval_method' must be 'hybrid', 'lexical', or 'semantic'", 400)
+                return
+            if limit < 1 or limit > 50:
+                self._send_error_json("'limit' must be between 1 and 50", 400)
+                return
+
+            indexer = self.indexer or RepositoryIndexer()
+            self.indexer = indexer
+            indexer.store.connect()
+            try:
+                session = indexer.store.get_chat_session(session_id)
+                if not session:
+                    self._send_error_json(f"Session '{session_id}' not found", 404)
+                    return
+                repo_id = session["repo_id"]
+                repo = indexer.store.get_repository(repo_id)
+                if not repo:
+                    self._send_error_json(f"Repository '{repo_id}' not found", 404)
+                    return
+            finally:
+                indexer.store.close()
+
+            # Save user message
+            user_msg_id = indexer.store.add_chat_message(
+                session_id, "user", question,
+                retrieval_method=retrieval_method,
+            )
+
+            # Set SSE headers
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
+
+            pipeline = RAGPipeline(indexer=indexer)
+
+            def _send_event(event: Dict[str, Any]) -> None:
+                """Send a single SSE event."""
+                try:
+                    data_line = f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                    self.wfile.write(data_line.encode("utf-8"))
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    raise
+
+            def _run_stream() -> None:
+                """Run the async streaming generator in a new event loop."""
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    gen = pipeline.ask_stream(
+                        repo_id=repo_id,
+                        question=question,
+                        retrieval_method=retrieval_method,
+                        limit=limit,
+                    )
+                    full_answer = ""
+                    citation_list = []
+                    while True:
+                        try:
+                            event = loop.run_until_complete(gen.__anext__())
+                            _send_event(event)
+                            if event.get("type") == "token":
+                                full_answer += event.get("text", "")
+                            elif event.get("type") == "done":
+                                citation_list = event.get("citations", [])
+                                break
+                        except StopAsyncIteration:
+                            break
+                    # Save assistant message
+                    if full_answer:
+                        indexer.store.add_chat_message(
+                            session_id, "assistant", full_answer,
+                            citations=citation_list,
+                        )
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    pass
+                finally:
+                    try:
+                        loop.run_until_complete(gen.aclose())
+                    except Exception:
+                        pass
+                    try:
+                        loop.close()
+                    except Exception:
+                        pass
+
+            try:
+                _run_stream()
+            except (BrokenPipeError, ConnectionResetError, OSError):
                 logger.debug("Client disconnected during streaming")
             return
 
