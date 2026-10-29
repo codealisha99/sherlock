@@ -6,9 +6,12 @@ architectural bottlenecks, and potential contribution opportunities.
 """
 
 from typing import List, Dict, Any
+import logging
 from app.agents.base import BaseAgent
 from app.analysis.context import AnalysisContext
 from app.analysis.models import GapAnalysis, GapItem
+
+logger = logging.getLogger(__name__)
 
 
 class GapAnalystAgent(BaseAgent):
@@ -45,6 +48,23 @@ class GapAnalystAgent(BaseAgent):
             ctx=ctx,
             empty_fields=["gaps"],
         )
+
+        # If LLM returned gaps but none reference actual TODO/FIXME text
+        # from the index, fall back to static synthesis (LLM may have
+        # returned generic gaps unrelated to the analyzed repository's
+        # actual content).
+        if result.gaps and ctx.index and ctx.index.todos_and_fixmes:
+            indexed_todo_texts = {t["text"] for t in ctx.index.todos_and_fixmes}
+            gaps_reference_todos = any(
+                any(todo_text in gap.gap for todo_text in indexed_todo_texts)
+                for gap in result.gaps
+            )
+            if not gaps_reference_todos:
+                logger.info(
+                    f"{self.name} LLM gaps do not reference indexed TODO/FIXME "
+                    f"content. Using static AST synthesis fallback."
+                )
+                result = self._synthesize_gaps(ctx)
 
         ctx.gap_analysis = result
         return result
