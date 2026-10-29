@@ -146,6 +146,32 @@ _SCHEMA = [
     CREATE INDEX IF NOT EXISTS idx_symbol_references_repo ON symbol_references(repo_id);
     CREATE INDEX IF NOT EXISTS idx_symbol_references_symbol ON symbol_references(symbol_name);
     CREATE INDEX IF NOT EXISTS idx_symbol_references_file ON symbol_references(file_id);
+    """
+    """
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+        id TEXT PRIMARY KEY,
+        repo_id TEXT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS chat_messages (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        citations TEXT,  -- JSON array of citation dicts
+        context_files TEXT,  -- JSON array of file paths used as context
+        created_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_chat_sessions_repo ON chat_sessions(repo_id);
+    CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated ON chat_sessions(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at);
     """,
 ]
 
@@ -1120,6 +1146,157 @@ class IndexStore:
             },
         }
 
+
+
+    # ------------------------------------------------------------------ #
+    # Chat session management
+    # ------------------------------------------------------------------ #
+
+    def create_chat_session(
+        self,
+        repo_id: str,
+        session_id: Optional[str] = None,
+        title: Optional[str] = None,
+    ) -> str:
+        """Create a new chat session for a repository.
+
+        Returns the session id.
+        """
+        import uuid
+
+        if session_id is None:
+            session_id = str(uuid.uuid4())
+        if title is None:
+            title = "New Chat"
+
+        now = _utc_now()
+        conn = self.connect()
+        conn.execute(
+            """
+            INSERT INTO chat_sessions (id, repo_id, title, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (session_id, repo_id, title, now, now),
+        )
+        conn.commit()
+        return session_id
+
+    def get_chat_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Get a chat session by id."""
+        conn = self.connect()
+        row = conn.execute(
+            "SELECT * FROM chat_sessions WHERE id = ?", (session_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def list_chat_sessions(self, repo_id: str) -> List[Dict[str, Any]]:
+        """List chat sessions for a repository, ordered by updated_at desc."""
+        conn = self.connect()
+        rows = conn.execute(
+            """
+            SELECT * FROM chat_sessions
+            WHERE repo_id = ?
+            ORDER BY updated_at DESC
+            """,
+            (repo_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_chat_session_title(self, session_id: str, title: str) -> bool:
+        """Update a chat session's title. Returns True if updated."""
+        conn = self.connect()
+        now = _utc_now()
+        cur = conn.execute(
+            """
+            UPDATE chat_sessions
+            SET title = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (title, now, session_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+    def delete_chat_session(self, session_id: str) -> bool:
+        """Delete a chat session and all its messages (cascade delete)."""
+        conn = self.connect()
+        cur = conn.execute(
+            "DELETE FROM chat_sessions WHERE id = ?", (session_id,)
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+    def add_chat_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        citations: Optional[List[Dict[str, Any]]] = None,
+        context_files: Optional[List[str]] = None,
+        message_id: Optional[str] = None,
+    ) -> str:
+        """Add a message to a chat session.
+
+        Returns the message id.
+        """
+        import json
+
+        if message_id is None:
+            message_id = str(uuid.uuid4())
+
+        now = _utc_now()
+        conn = self.connect()
+        conn.execute(
+            """
+            INSERT INTO chat_messages
+            (id, session_id, role, content, citations, context_files, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                message_id,
+                session_id,
+                role,
+                content,
+                json.dumps(citations or [], ensure_ascii=False),
+                json.dumps(context_files or [], ensure_ascii=False),
+                now,
+            ),
+        )
+        # Update session updated_at
+        conn.execute(
+            "UPDATE chat_sessions SET updated_at = ? WHERE id = ?",
+            (now, session_id),
+        )
+        conn.commit()
+        return message_id
+
+    def get_chat_messages(self, session_id: str) -> List[Dict[str, Any]]:
+        """Get all messages for a session, ordered by created_at asc."""
+        import json
+
+        conn = self.connect()
+        rows = conn.execute(
+            """
+            SELECT * FROM chat_messages
+            WHERE session_id = ?
+            ORDER BY created_at ASC, id ASC
+            """,
+            (session_id,),
+        ).fetchall()
+        messages = []
+        for r in rows:
+            msg = dict(r)
+            # Parse JSON fields
+            try:
+                msg["citations"] = json.loads(msg["citations"] or "[]")
+            except (json.JSONDecodeError, TypeError):
+                msg["citations"] = []
+            try:
+                msg["context_files"] = json.loads(msg["context_files"] or "[]")
+            except (json.JSONDecodeError, TypeError):
+                msg["context_files"] = []
+            messages.append(msg)
+        return messages
 
 def _utc_now() -> str:
     from datetime import datetime, timezone
