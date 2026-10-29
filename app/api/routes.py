@@ -568,6 +568,8 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.end_headers()
 
+            from app.rag.pipeline import RAGPipeline
+
             pipeline = RAGPipeline(indexer=indexer)
 
             def _send_event(event: Dict[str, Any]) -> None:
@@ -676,6 +678,8 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.end_headers()
+
+            from app.rag.pipeline import RAGPipeline
 
             pipeline = RAGPipeline(indexer=indexer)
 
