@@ -428,6 +428,7 @@ class TestAcceptance6CLIAPIFailureHandling(unittest.TestCase):
                         question="How to add?",
                         retrieval_method="hybrid",
                         limit=10,
+                        stream=False,
                     ))
         self.assertEqual(exit_code, 0)
         self.assertIn("Answer via CLI [S1]", stdout.getvalue())
