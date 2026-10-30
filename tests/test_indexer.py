@@ -25,6 +25,16 @@ def _make_repo(files):
 
 class TestRepositoryIndexer(unittest.TestCase):
     def setUp(self):
+        # Clean default database to prevent cross-test pollution
+        from app.indexer import RepositoryIndexer
+        from pathlib import Path
+        idx = RepositoryIndexer()
+        idx.store.connect()
+        try:
+            for repo in idx.store.list_repositories():
+                idx.remove_repository(repo["id"])
+        finally:
+            idx.store.close()
         self.idx = RepositoryIndexer()
 
     def _cleanup(self, root):
