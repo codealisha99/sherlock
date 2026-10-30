@@ -8,9 +8,12 @@ let currentAnalysisId = null;
 let currentReport = null;
 let currentPageNumber = 1;
 let pollInterval = null;
+let currentIndexRepo = null;
+let indexPollInterval = null;
 
 // DOM Elements
 const btnAnalyze = document.getElementById("btn-analyze");
+const btnIndex = document.getElementById("btn-index");
 const inputProjectPath = document.getElementById("project-path-input");
 const pipelineProgress = document.getElementById("pipeline-progress");
 const activeAgentLabel = document.getElementById("active-agent-label");
@@ -52,13 +55,17 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 async function checkOllamaHealth() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   try {
-    const res = await fetch("/api/health");
+    const res = await fetch("/api/health", { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!res.ok) throw new Error("Health check failed");
     const data = await res.json();
     const ollama = data.ollama;
 
-    if (ollama.available) {
+    if (ollama && ollama.available) {
       ollamaStatusBadge.className = "status-pill status-connected";
       ollamaStatusText.textContent = `Ollama: ${ollama.configured_model}`;
     } else {
@@ -66,13 +73,22 @@ async function checkOllamaHealth() {
       ollamaStatusText.textContent = "Ollama: Offline (Static Mode Active)";
     }
   } catch (err) {
-    ollamaStatusBadge.className = "status-pill status-offline";
-    ollamaStatusText.textContent = "Ollama: Offline (Static Mode Active)";
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      ollamaStatusBadge.className = "status-pill status-offline";
+      ollamaStatusText.textContent = "Ollama: Health check timed out";
+    } else {
+      ollamaStatusBadge.className = "status-pill status-offline";
+      ollamaStatusText.textContent = "Ollama: Offline (Static Mode Active)";
+    }
   }
 }
 
 function setupEventListeners() {
   btnAnalyze.addEventListener("click", startAnalysis);
+  if (btnIndex) {
+    btnIndex.addEventListener("click", startIndexing);
+  }
   btnPrevPage.addEventListener("click", () => navigateToPage(currentPageNumber - 1));
   btnNextPage.addEventListener("click", () => navigateToPage(currentPageNumber + 1));
 
@@ -137,6 +153,89 @@ async function startAnalysis() {
     alert("Error: " + err.message);
     btnAnalyze.disabled = false;
     btnAnalyze.innerHTML = '<span class="btn-icon">⚡</span> Analyze Codebase';
+  }
+}
+
+// ==============================================================================
+// Index Workspace (Model-Free - Works Without Ollama)
+// ==============================================================================
+
+async function startIndexing() {
+  const projectPath = inputProjectPath.value.trim();
+  if (!projectPath) {
+    alert("Please enter a valid repository directory path.");
+    return;
+  }
+
+  const repoName = projectPath.split("/").pop() || projectPath;
+  currentIndexRepo = repoName;
+
+  btnIndex.disabled = true;
+  btnIndex.innerHTML = '<span class="spinner" style="width:14px;height:14px;display:inline-block;margin:0 6px 0 0;"></span> Indexing...';
+  pipelineProgress.classList.remove("hidden");
+
+  // Reset agent chips for indexing view
+  Object.values(agentChipMap).forEach(chip => {
+    chip.className = "agent-chip";
+    chip.querySelector(".agent-status-icon").textContent = "⏳";
+  });
+
+  try {
+    const res = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_path: projectPath, repo_name: repoName }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || "Failed to start indexing");
+    }
+
+    const data = await res.json();
+    activeAgentLabel.textContent = "Indexing files...";
+
+    // Start polling repo status
+    if (indexPollInterval) clearInterval(indexPollInterval);
+    indexPollInterval = setInterval(pollIndexStatus, 1000);
+
+  } catch (err) {
+    alert("Error: " + err.message);
+    btnIndex.disabled = false;
+    btnIndex.innerHTML = '<span class="btn-icon">📥</span> Index Workspace';
+  }
+}
+
+async function pollIndexStatus() {
+  if (!currentIndexRepo) return;
+
+  try {
+    const res = await fetch("/api/index/repos");
+    if (!res.ok) return;
+    const data = await res.json();
+
+    // Find the repo we just indexed
+    const repo = (data.repositories || []).find(
+      r => r.name === currentIndexRepo || r.path === inputProjectPath.value.trim()
+    );
+    if (!repo) return;
+
+    activeAgentLabel.textContent = (repo.status || "unknown").replace("_", " ").toUpperCase();
+
+    if (repo.status === "complete") {
+      clearInterval(indexPollInterval);
+      activeAgentLabel.textContent = "Indexing Complete";
+      btnIndex.disabled = false;
+      btnIndex.innerHTML = '<span class="btn-icon">📥</span> Index Workspace';
+      alert("Workspace indexed successfully! You can now use chat and search features.");
+    } else if (repo.status === "failed" || repo.status === "error") {
+      clearInterval(indexPollInterval);
+      alert("Indexing failed: " + (repo.error || "Unknown error"));
+      btnIndex.disabled = false;
+      btnIndex.innerHTML = '<span class="btn-icon">📥</span> Index Workspace';
+    }
+  } catch (err) {
+    console.error("Index polling error:", err);
   }
 }
 
@@ -836,9 +935,9 @@ function addCitations(messageDiv, citations) {
     citationsContainer.appendChild(chip);
   });
 
-  const messageDiv = document.querySelector('.chat-message:last-child');
-  if (messageDiv) {
-    messageDiv.appendChild(citationsContainer);
+  const messageDivEl = document.querySelector('.chat-message:last-child');
+  if (messageDivEl) {
+    messageDivEl.appendChild(citationsContainer);
   }
 }
 
@@ -850,236 +949,3 @@ window.sherlockChat = {
   setRepoId: (id) => { currentRepoId = id; },
   open: () => { if (!isOpen) toggleChat(); }
 };
-CHATPYEOF
-echo "Chat widget JS written"
-
-// ==============================================================================
-// Chat Widget - Floating RAG Q&A Widget
-// ==============================================================================
-
-let chatWidget = null;
-let chatPanel = null;
-let chatBubble = null;
-let chatInput = null;
-let chatMessages = null;
-let chatStatus = null;
-let currentChatSessionId = null;
-let currentRepoId = null;
-let isStreaming = false;
-let isOpen = false;
-
-function initChatWidget() {
-  chatWidget = document.getElementById('chat-widget');
-  chatPanel = document.getElementById('chat-panel');
-  chatBubble = document.getElementById('chat-bubble');
-  chatInput = document.getElementById('chat-input');
-  chatMessages = document.getElementById('chat-messages');
-  chatStatus = document.getElementById('chat-status');
-
-  const btnClose = document.getElementById('chat-close');
-  const btnNewChat = document.getElementById('chat-new-chat');
-  const btnSend = document.getElementById('chat-send');
-
-  chatBubble.addEventListener('click', toggleChat);
-  btnClose.addEventListener('click', () => { isOpen = false; chatPanel.classList.add('hidden'); });
-  btnNewChat.addEventListener('click', startNewChat);
-  btnSend.addEventListener('click', sendMessage);
-
-  chatInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isOpen) {
-      chatPanel.classList.add('hidden');
-      isOpen = false;
-    }
-  });
-}
-
-function toggleChat() {
-  isOpen = !isOpen;
-  if (isOpen) {
-    chatPanel.classList.remove('hidden');
-    chatInput.focus();
-  } else {
-    chatPanel.classList.add('hidden');
-  }
-}
-
-function startNewChat() {
-  currentChatSessionId = null;
-  chatMessages.innerHTML = '';
-  chatInput.value = '';
-  chatStatus.textContent = '';
-  addSystemMessage('New chat started. Ask a question about your codebase.');
-  fetchCreateSession();
-}
-
-async function fetchCreateSession() {
-  try {
-    const response = await fetch('/api/chat/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ repo_id: currentRepoId })
-    });
-    if (response.ok) {
-      const data = await response.json();
-      currentChatSessionId = data.session_id;
-      document.getElementById('chat-session-title').textContent = data.title || 'New Chat';
-    }
-  } catch (err) {
-    console.error('Create session failed:', err);
-    chatStatus.textContent = 'Error creating session';
-  }
-}
-
-async function sendMessage() {
-  const text = chatInput.value.trim();
-  if (!text || isStreaming) return;
-
-  chatInput.value = '';
-  chatInput.disabled = true;
-
-  addMessage('user', text);
-
-  if (!currentChatSessionId) {
-    await fetchCreateSession();
-  }
-
-  chatStatus.textContent = 'Sherlock is thinking...';
-  isStreaming = true;
-
-  const streamingMsg = addMessage('assistant', '', true);
-
-  try {
-    const response = await fetch(`/api/chat/sessions/${currentChatSessionId}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: text, retrieval_method: 'hybrid', limit: 10 })
-    });
-
-    if (!response.ok) {
-      throw new Error('Request failed: ' + response.status);
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let fullAnswer = '';
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const event = JSON.parse(line.slice(6));
-            if (event.type === 'token') {
-              fullAnswer += event.text;
-              updateStreamingMessage(streamingMsg, fullAnswer);
-            } else if (event.type === 'done') {
-              fullAnswer = event.answer;
-              updateStreamingMessage(streamingMsg, fullAnswer);
-              if (event.citations && event.citations.length > 0) {
-                addCitations(streamingMsg, event.citations);
-              }
-              isStreaming = false;
-              chatInput.disabled = false;
-              chatStatus.textContent = '';
-            }
-          } catch (e) {
-            console.error('SSE parse error:', e);
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Stream error:', err);
-    chatStatus.textContent = 'Error: ' + err.message;
-    isStreaming = false;
-    chatInput.disabled = false;
-  }
-}
-
-function addMessage(role, text, streaming = false) {
-  const div = document.createElement('div');
-  div.className = 'chat-message ' + role;
-
-  const bubble = document.createElement('div');
-  bubble.className = 'chat-message-bubble';
-
-  if (streaming) {
-    div.classList.add('streaming');
-    bubble.textContent = text;
-    div.appendChild(bubble);
-    chatMessages.appendChild(div);
-    scrollToBottom();
-    return div;
-  }
-
-  div.appendChild(bubble);
-  chatMessages.appendChild(div);
-  scrollToBottom();
-
-  let i = 0;
-  function type() {
-    if (i < text.length) {
-      bubble.textContent += text.charAt(i);
-      i++;
-      scrollToBottom();
-      setTimeout(type, 10);
-    }
-  }
-  type();
-
-  return div;
-}
-
-function updateStreamingMessage(div, text) {
-  const bubble = div.querySelector('.chat-message-bubble') || div;
-  bubble.textContent = text;
-  scrollToBottom();
-}
-
-function addCitations(messageDiv, citations) {
-  const citationsContainer = document.createElement('div');
-  citationsContainer.className = 'citations';
-  citationsContainer.style.marginTop = '10px';
-
-  citations.forEach((c, idx) => {
-    const chip = document.createElement('div');
-    chip.className = 'citation-chip';
-    chip.textContent = c.source_id + ' ' + c.file_path + ':' + c.start_line;
-    chip.onclick = () => {
-      if (typeof openFileViewer === 'function') {
-        openFileViewer(c.file_path);
-      }
-    };
-    citationsContainer.appendChild(chip);
-  });
-
-  const messageDiv = document.querySelector('.chat-message:last-child');
-  if (messageDiv) {
-    messageDiv.appendChild(citationsContainer);
-  }
-}
-
-function scrollToBottom() {
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-window.sherlockChat = {
-  setRepoId: (id) => { currentRepoId = id; },
-  open: () => { if (!isOpen) toggleChat(); }
-};
-CHATPYEOF
-echo "Chat widget JavaScript appended to app.js"
