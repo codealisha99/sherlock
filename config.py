@@ -10,7 +10,7 @@ indexing, searching, or querying.
 
 from pathlib import Path
 import os
-from typing import List, Set
+from typing import List, Optional, Set
 from pydantic import BaseModel, Field
 
 
@@ -29,6 +29,60 @@ class SherlockConfig(BaseModel):
     )
     max_retries: int = Field(default=2)
 
+    # ------------------------------------------------------------------ #
+    # LLM Gateway configuration (GroqCloud + Ollama provider selection)
+    # ------------------------------------------------------------------ #
+    # Provider selection: "groq" or "ollama". Defaults to ollama if Groq
+    # API key is not configured, otherwise groq.
+    llm_provider: str = Field(
+        default_factory=lambda: os.getenv("LLM_PROVIDER", "ollama")
+    )
+
+    # GroqCloud settings (only used when LLM_PROVIDER=groq).
+    llm_groq_api_key: str = Field(
+        default_factory=lambda: os.getenv("GROQ_API_KEY", "")
+    )
+    llm_groq_model: str = Field(
+        default_factory=lambda: os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    )
+    llm_groq_timeout_seconds: int = Field(
+        default_factory=lambda: int(os.getenv("GROQ_TIMEOUT_SECONDS", "45"))
+    )
+
+    # Strict free-tier budget protection (UTC-based daily windows).
+    llm_daily_request_budget: int = Field(
+        default_factory=lambda: int(os.getenv("LLM_DAILY_REQUEST_BUDGET", "100"))
+    )
+    llm_daily_token_budget: int = Field(
+        default_factory=lambda: int(os.getenv("LLM_DAILY_TOKEN_BUDGET", "50000"))
+    )
+    llm_per_minute_request_limit: int = Field(
+        default_factory=lambda: int(os.getenv("LLM_PER_MINUTE_REQUEST_LIMIT", "20"))
+    )
+    llm_per_minute_token_limit: int = Field(
+        default_factory=lambda: int(os.getenv("LLM_PER_MINUTE_TOKEN_LIMIT", "10000"))
+    )
+    llm_max_concurrent_requests: int = Field(
+        default_factory=lambda: int(os.getenv("LLM_MAX_CONCURRENT_REQUESTS", "2"))
+    )
+    llm_max_output_tokens: int = Field(
+        default_factory=lambda: int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "1500"))
+    )
+
+    # Quota database path (SQLite, durable usage/reservation records).
+    llm_quota_db_path: Path = Field(
+        default_factory=lambda: Path(__file__).resolve().parent / "index" / "llm_quota.db"
+    )
+
+    # Repository run isolation for caching and request metadata.
+    llm_repo_isolation: bool = Field(
+        default_factory=lambda: os.getenv("LLM_REPO_ISOLATION", "true").lower() == "true"
+    )
+
+    # Repository content/index version for cache keying (set by indexer).
+    llm_repo_content_version: Optional[str] = Field(default=None)
+
+    # ------------------------------------------------------------------ #
     # Repository scanning limits & safety
     max_file_size_bytes: int = Field(default=150_000)  # 150 KB
     max_files_to_index: int = Field(default=2500)
