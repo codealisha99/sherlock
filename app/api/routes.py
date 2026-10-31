@@ -27,6 +27,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
 
     orchestrator: Optional[Orchestrator] = None
     indexer: Optional[RepositoryIndexer] = None
+    gateway: Optional[Any] = None
     enable_ai: bool = False
     frontend_dir: Path = Path(__file__).resolve().parent.parent.parent / "frontend"
 
@@ -480,7 +481,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                 indexer.store.close()
 
             try:
-                pipeline = RAGPipeline(indexer=indexer)
+                pipeline = RAGPipeline(indexer=indexer, gateway=getattr(self, "gateway", None))
                 result = pipeline.ask(
                     repo_id=repo_id,
                     question=question,
@@ -570,7 +571,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
 
             from app.rag.pipeline import RAGPipeline
 
-            pipeline = RAGPipeline(indexer=indexer)
+            pipeline = RAGPipeline(indexer=indexer, gateway=getattr(self, "gateway", None))
 
             def _send_event(event: Dict[str, Any]) -> None:
                 """Send a single SSE event."""
@@ -681,7 +682,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
 
             from app.rag.pipeline import RAGPipeline
 
-            pipeline = RAGPipeline(indexer=indexer)
+            pipeline = RAGPipeline(indexer=indexer, gateway=getattr(self, "gateway", None))
 
             def _send_event(event: Dict[str, Any]) -> None:
                 """Send a single SSE event."""

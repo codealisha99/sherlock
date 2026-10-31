@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 from config import config
+from app.llm.gateway import LLMGateway
 
 logging.basicConfig(
     level=logging.INFO,
@@ -452,6 +453,11 @@ def cmd_ask(args) -> int:
 
     pipeline = RAGPipeline(indexer=indexer)
 
+    # Attach the LLM Gateway if AI is enabled (Groq/Ollama provider).
+    gateway = getattr(SherlockRequestHandler, "gateway", None)
+    if gateway is not None:
+        pipeline.gateway = gateway
+
     if args.stream:
         return _cmd_ask_stream(pipeline, args)
 
@@ -749,9 +755,12 @@ def run_server(host: str, port: int, auto_open: bool = False, enable_ai: bool = 
     if enable_ai:
         from app.orchestrator.orchestrator import Orchestrator
 
-        orchestrator = Orchestrator()
+        gateway = LLMGateway()
+        orchestrator = Orchestrator(gateway=gateway)
+        SherlockRequestHandler.gateway = gateway
     else:
         orchestrator = None
+        SherlockRequestHandler.gateway = None
     SherlockRequestHandler.orchestrator = orchestrator
     SherlockRequestHandler.enable_ai = enable_ai
 

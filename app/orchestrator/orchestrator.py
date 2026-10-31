@@ -24,6 +24,7 @@ from app.agents.component_analyst import ComponentAnalystAgent
 from app.agents.data_integration_analyst import DataIntegrationAnalystAgent
 from app.agents.gap_analyst import GapAnalystAgent
 from app.agents.teacher import TeacherAgent
+from app.llm.gateway import LLMGateway
 from app.llm.ollama_client import OllamaClient
 
 logger = logging.getLogger(__name__)
@@ -36,21 +37,35 @@ class Orchestrator:
         self,
         sherlock_cfg: Optional[SherlockConfig] = None,
         llm_client: Optional[OllamaClient] = None,
+        gateway: Optional[LLMGateway] = None,
     ):
         self.cfg = sherlock_cfg or config
         self.llm = llm_client or OllamaClient(self.cfg)
+        self.gateway = gateway
         self.artifact_mgr = ArtifactManager(self.cfg.workspace_dir)
 
         # In-memory registry of analyses
         self.active_analyses: Dict[str, AnalysisContext] = {}
 
         # Instantiate specialized agents
-        self.agent_mapper = RepositoryMapperAgent(llm_client=self.llm, sherlock_cfg=self.cfg)
-        self.agent_flow = FlowTracerAgent(llm_client=self.llm, sherlock_cfg=self.cfg)
-        self.agent_component = ComponentAnalystAgent(llm_client=self.llm, sherlock_cfg=self.cfg)
-        self.agent_data = DataIntegrationAnalystAgent(llm_client=self.llm, sherlock_cfg=self.cfg)
-        self.agent_gap = GapAnalystAgent(llm_client=self.llm, sherlock_cfg=self.cfg)
-        self.agent_teacher = TeacherAgent(llm_client=self.llm, sherlock_cfg=self.cfg)
+        self.agent_mapper = RepositoryMapperAgent(
+            llm_client=self.llm, gateway=self.gateway, sherlock_cfg=self.cfg
+        )
+        self.agent_flow = FlowTracerAgent(
+            llm_client=self.llm, gateway=self.gateway, sherlock_cfg=self.cfg
+        )
+        self.agent_component = ComponentAnalystAgent(
+            llm_client=self.llm, gateway=self.gateway, sherlock_cfg=self.cfg
+        )
+        self.agent_data = DataIntegrationAnalystAgent(
+            llm_client=self.llm, gateway=self.gateway, sherlock_cfg=self.cfg
+        )
+        self.agent_gap = GapAnalystAgent(
+            llm_client=self.llm, gateway=self.gateway, sherlock_cfg=self.cfg
+        )
+        self.agent_teacher = TeacherAgent(
+            llm_client=self.llm, gateway=self.gateway, sherlock_cfg=self.cfg
+        )
 
     def run_analysis(
         self,
