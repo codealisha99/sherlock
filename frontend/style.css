@@ -1,23 +1,76 @@
-/* Sherlock Dark Theme Stylesheet */
+/* Sherlock Design Tokens — warm light "research library" aesthetic */
 :root {
-  --bg-primary: #0d1117;
-  --bg-secondary: #161b22;
-  --bg-tertiary: #21262d;
-  --bg-subtle: #2b313a;
-  --border-color: #30363d;
-  --border-subtle: #21262d;
-  --text-primary: #f0f6fc;
-  --text-secondary: #8b949e;
-  --text-muted: #6e7681;
-  --accent-blue: #58a6ff;
-  --accent-green: #2ea043;
-  --accent-green-dark: #238636;
-  --accent-orange: #d29922;
-  --accent-red: #f85149;
-  --accent-purple: #bc8cff;
-  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  /* Canvas & surfaces */
+  --bg-primary: #fbf7f1;      /* warm cream canvas */
+  --bg-secondary: #fffdf8;     /* panel / card surface */
+  --bg-tertiary: #f5efe1;      /* subtle wells: inputs, insets */
+  --bg-subtle: #f1e9d8;        /* hover tint */
+  --bg-inset: #f7f2e6;
+
+  /* Borders */
+  --border-color: #e9e0cf;
+  --border-subtle: #f2eadb;
+  --border-strong: #d8cdb4;
+
+  /* Text */
+  --text-primary: #2a2622;     /* near-black warm */
+  --text-secondary: #6b645c;   /* muted warm grey */
+  --text-muted: #8a8175;
+  --text-on-accent: #fffdf8;
+
+  /* Accent family — sage is the primary action color */
+  --accent-sage: #7c9a6d;
+  --accent-sage-strong: #5f7a54;
+  --accent-lavender: #a08fd0;
+  --accent-butter: #d9b45b;
+  --accent-blush: #d08b82;
+  --accent-sand: #b39a68;
+  --accent-sky: #7fa3c2;
+  --accent-peach: #cf8260;
+  --accent-blue: #4e7fa6;
+  --accent-purple: #7d68a8;
+  --accent-red: #b3543f;
+  --accent-orange: #b98a2f;
+  --accent-green: #6f8f5e;
+
+  /* Typography */
+  --font-serif: "Newsreader", "Source Serif 4", Georgia, serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Shape scale */
+  --radius-chip: 999px;
+  --radius-btn: 999px;
+  --radius-card: 16px;
+  --radius-panel: 20px;
+  --radius-control: 10px;
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px rgba(42, 38, 33, 0.05), 0 12px 32px rgba(42, 38, 33, 0.07);
+  --shadow-lift: 0 2px 6px rgba(42, 38, 33, 0.07), 0 16px 40px rgba(42, 38, 33, 0.12);
+
+  /* Pastel category palette: each accent has fill / border / dot tones */
+  --pastel-sage: #e9efe2;
+  --pastel-sage-border: #c9d6b8;
+  --pastel-sage-dot: #7c9a6d;
+  --pastel-lavender: #ece7f5;
+  --pastel-lavender-border: #cfc2e4;
+  --pastel-lavender-dot: #8a76b8;
+  --pastel-butter: #f8f0da;
+  --pastel-butter-border: #e6d3a3;
+  --pastel-butter-dot: #c9a24f;
+  --pastel-blush: #f9e9e5;
+  --pastel-blush-border: #ecc7bd;
+  --pastel-blush-dot: #d18a80;
+  --pastel-sand: #f5efe0;
+  --pastel-sand-border: #e0d2ae;
+  --pastel-sand-dot: #b39a68;
+  --pastel-sky: #e8f0f7;
+  --pastel-sky-border: #c2d6e6;
+  --pastel-sky-dot: #6f97b5;
+  --pastel-peach: #fae9e0;
+  --pastel-peach-border: #ecc2a8;
+  --pastel-peach-dot: #cf8260;
 }
 
 * {
@@ -30,11 +83,26 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
   overflow-x: hidden;
   height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* Design tokens only — no hard-coded colors in components (see :root above) */
+h1, h2, h3, h4 {
+  font-family: var(--font-serif);
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+p { color: var(--text-secondary); }
+
+code {
+  font-family: var(--font-mono);
 }
 
 /* Header */
@@ -55,9 +123,10 @@ body {
 }
 
 .logo-title {
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  font-size: 1.25rem;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  font-size: 1.6rem;
   color: var(--text-primary);
 }
 
@@ -67,11 +136,12 @@ body {
   border-radius: 12px;
   font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .badge-subtle {
   background: var(--bg-tertiary);
-  color: var(--accent-blue);
+  color: var(--accent-sage-strong);
   border: 1px solid var(--border-color);
 }
 
@@ -135,11 +205,11 @@ body {
 }
 
 .input-group input {
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   padding: 10px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font-family: var(--font-mono);
   font-size: 0.92rem;
   outline: none;
@@ -147,7 +217,7 @@ body {
 }
 
 .input-group input:focus {
-  border-color: var(--accent-blue);
+  border-color: var(--accent-sage);
 }
 
 .btn {
@@ -155,7 +225,7 @@ body {
   align-items: center;
   gap: 6px;
   padding: 10px 18px;
-  border-radius: 6px;
+  border-radius: var(--radius-btn);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -164,12 +234,12 @@ body {
 }
 
 .btn-primary {
-  background-color: var(--accent-green-dark);
-  color: #ffffff;
+  background-color: var(--accent-sage-strong);
+  color: var(--text-on-accent);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: var(--accent-green);
+  background-color: var(--accent-sage);
 }
 
 .btn-primary:disabled {
@@ -197,13 +267,32 @@ body {
   font-size: 0.8rem;
 }
 
-/* Pipeline Progress Grid */
-.pipeline-card {
-  margin-top: 14px;
+/* Cards & Content Typography */
+.card {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 14px;
+  border-radius: var(--radius-card);
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-card);
+}
+
+.card-title {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
 .pipeline-header {
