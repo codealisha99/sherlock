@@ -113,6 +113,11 @@ function setupEventListeners() {
   btnPrevPage.addEventListener("click", () => navigateToPage(currentPageNumber - 1));
   btnNextPage.addEventListener("click", () => navigateToPage(currentPageNumber + 1));
 
+  const btnEmptyAnalyze = document.getElementById("btn-empty-analyze");
+  if (btnEmptyAnalyze) {
+    btnEmptyAnalyze.addEventListener("click", startAnalysis);
+  }
+
   // Folder-style tab navigation
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => setActiveTab(btn.getAttribute("data-tab")));
@@ -181,6 +186,11 @@ async function startAnalysis() {
   btnAnalyze.disabled = true;
   btnAnalyze.innerHTML = '<span class="spinner" style="width:14px;height:14px;display:inline-block;margin:0 6px 0 0;"></span> Analyzing...';
   pipelineProgress.classList.remove("hidden");
+  // Empty state lives in #page-body, which renderers wipe — re-query each run
+  const emptyEl = document.getElementById("empty-state");
+  const loadingEl = document.getElementById("loading-state");
+  if (emptyEl) emptyEl.classList.add("hidden");
+  if (loadingEl) loadingEl.classList.remove("hidden");
 
   // Reset agent chips
   Object.values(agentChipMap).forEach(chip => {
@@ -360,6 +370,17 @@ async function pollProgress() {
       pct = 8; // initializing
     }
     if (pipelineProgressFill) pipelineProgressFill.style.width = pct + "%";
+
+    // Show skeleton cards while the pipeline is still running
+    if (progress.status !== "completed" && progress.status !== "failed") {
+      pageBody.innerHTML = `
+        <div class="card-grid">
+          <div class="card skeleton-card"></div>
+          <div class="card skeleton-card"></div>
+          <div class="card skeleton-card"></div>
+        </div>
+      `;
+    }
 
     if (progress.status === "completed" || progress.has_report) {
       clearInterval(pollInterval);

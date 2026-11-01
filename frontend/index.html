@@ -232,7 +232,14 @@
 
         <!-- Render Target for Active Page -->
         <div id="page-body" class="page-body">
-          <div class="loading-state">
+          <div id="empty-state" class="empty-state">
+            <div class="empty-icon">🧭</div>
+            <h2 class="empty-title">Explore any codebase</h2>
+            <p class="empty-sub">Paste a repository path and Sherlock will map its architecture, flows, components, data, gaps and mental models.</p>
+            <button id="btn-empty-analyze" class="btn btn-primary" type="button">Analyze Codebase</button>
+          </div>
+
+          <div id="loading-state" class="loading-state">
             <div class="spinner"></div>
             <p>Gathering intelligence...</p>
           </div>
