@@ -16,9 +16,11 @@ const btnAnalyze = document.getElementById("btn-analyze");
 const btnIndex = document.getElementById("btn-index");
 const inputProjectPath = document.getElementById("project-path-input");
 const pipelineProgress = document.getElementById("pipeline-progress");
+const pipelineProgressFill = document.getElementById("pipeline-progress-fill");
 const activeAgentLabel = document.getElementById("active-agent-label");
 const analysisIdBadge = document.getElementById("analysis-id-badge");
 const reportContainer = document.getElementById("report-container");
+const agentList = document.getElementById("agent-list");
 const sidebarProjectName = document.getElementById("sidebar-project-name");
 const pageTitle = document.getElementById("page-title");
 const pageSubtitle = document.getElementById("page-subtitle");
@@ -89,6 +91,10 @@ function setupEventListeners() {
   if (btnIndex) {
     btnIndex.addEventListener("click", startIndexing);
   }
+  const btnNewAnalysis = document.getElementById("btn-new-analysis");
+  if (btnNewAnalysis) {
+    btnNewAnalysis.addEventListener("click", startAnalysis);
+  }
   btnPrevPage.addEventListener("click", () => navigateToPage(currentPageNumber - 1));
   btnNextPage.addEventListener("click", () => navigateToPage(currentPageNumber + 1));
 
@@ -105,6 +111,40 @@ function setupEventListeners() {
   codeModal.addEventListener("click", (e) => {
     if (e.target === codeModal) codeModal.classList.add("hidden");
   });
+}
+
+// ==============================================================================
+// Agent Status Sidebar
+// ==============================================================================
+
+function resetAgentRows() {
+  if (!agentList) return;
+  agentList.querySelectorAll(".agent-row").forEach(row => {
+    row.classList.remove("active");
+    const dot = row.querySelector(".agent-dot");
+    if (dot) dot.className = "agent-dot agent-pending";
+    const statusEl = row.querySelector(".agent-row-status");
+    if (statusEl) statusEl.textContent = "Pending";
+  });
+}
+
+function setAgentRowStatus(agentName, status) {
+  if (!agentList) return;
+  const rows = Array.from(agentList.querySelectorAll(".agent-row"));
+  const target = rows.find(r => r.getAttribute("data-agent") === agentName);
+  if (!target) return;
+  const dot = target.querySelector(".agent-dot");
+  const statusEl = target.querySelector(".agent-row-status");
+  const running = status === "running";
+  const done = status === "completed";
+  const failed = status === "failed";
+  if (dot) {
+    dot.className = failed ? "agent-dot agent-failed" : done ? "agent-dot agent-done" : running ? "agent-dot agent-running" : "agent-dot agent-pending";
+  }
+  if (statusEl) {
+    statusEl.textContent = status === "completed" ? "Done" : status.charAt(0).toUpperCase() + status.slice(1);
+  }
+  target.classList.toggle("active", running);
 }
 
 // ==============================================================================
@@ -127,6 +167,7 @@ async function startAnalysis() {
     chip.className = "agent-chip";
     chip.querySelector(".agent-status-icon").textContent = "⏳";
   });
+  resetAgentRows();
 
   try {
     const res = await fetch("/api/analyze", {
@@ -179,6 +220,7 @@ async function startIndexing() {
     chip.className = "agent-chip";
     chip.querySelector(".agent-status-icon").textContent = "⏳";
   });
+  resetAgentRows();
 
   try {
     const res = await fetch("/api/index", {
@@ -262,6 +304,42 @@ async function pollProgress() {
       else if (status === "failed") icon.textContent = "✕";
       else icon.textContent = "⏳";
     }
+
+    // Update sidebar agent rows
+    const statusesNow = progress.agent_statuses || {};
+    agentList.querySelectorAll(".agent-row").forEach(row => {
+      const agentName = row.getAttribute("data-agent");
+      const status = statusesNow[agentName] || "pending";
+      const dot = row.querySelector(".agent-dot");
+      const statusEl = row.querySelector(".agent-row-status");
+      const running = status === "running";
+      const done = status === "completed";
+      const failed = status === "failed";
+      if (dot) {
+        dot.className = failed ? "agent-dot agent-failed" : done ? "agent-dot agent-done" : running ? "agent-dot agent-running" : "agent-dot agent-pending";
+      }
+      if (statusEl) {
+        statusEl.textContent = status === "completed" ? "Done" : status.charAt(0).toUpperCase() + status.slice(1);
+      }
+      row.classList.toggle("active", running);
+    });
+
+    // Slim pipeline progress bar (computed from agent completion state)
+    const agentNames = Object.keys(statusesNow);
+    const totalAgents = agentNames.length || 6;
+    const doneCount = Object.values(statusesNow).filter(s => s === "completed").length;
+    const runningCount = Object.values(statusesNow).filter(s => s === "running").length;
+    let pct = 0;
+    if (progress.status === "completed" || progress.has_report) {
+      pct = 100;
+    } else if (progress.status === "failed") {
+      pct = Math.round((doneCount / totalAgents) * 100);
+    } else if (runningCount > 0) {
+      pct = Math.round((doneCount / totalAgents) * 100);
+    } else {
+      pct = 8; // initializing
+    }
+    if (pipelineProgressFill) pipelineProgressFill.style.width = pct + "%";
 
     if (progress.status === "completed" || progress.has_report) {
       clearInterval(pollInterval);
