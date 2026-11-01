@@ -3,45 +3,50 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
   <title>Sherlock — Codebase Intelligence & Architecture Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
   <!-- Mermaid.js for interactive diagrams -->
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script>
     mermaid.initialize({
       startOnLoad: false,
-      theme: 'dark',
+      theme: 'default',
       securityLevel: 'loose',
       themeVariables: {
-        darkMode: true,
-        background: '#0d1117',
-        primaryColor: '#238636',
-        primaryBorderColor: '#2ea043',
-        lineColor: '#58a6ff'
+        background: '#fffdf8',
+        primaryColor: '#7c9a6d',
+        primaryBorderColor: '#5f7a54',
+        lineColor: '#8a8175'
       }
     });
   </script>
 </head>
 <body>
-  <!-- Top Navigation Header -->
-  <header class="app-header">
-    <div class="header-left">
-      <div class="logo">
-        <span class="magnifier">🔍</span>
-        <span class="logo-title">SHERLOCK</span>
-        <span class="badge badge-subtle">V1.0 ARCHITECTURE EXPLORER</span>
+  <!-- Single rounded panel shell -->
+  <div class="app-shell">
+    <!-- Top Bar -->
+    <header class="app-header">
+      <div class="topbar-left">
+        <div class="logo">
+          <span class="magnifier">🔍</span>
+          <span class="logo-title">SHERLOCK</span>
+          <span class="badge badge-subtle">V1.0 Architecture Explorer</span>
+        </div>
       </div>
-    </div>
-    <div class="header-right">
-      <div id="ollama-status-badge" class="status-pill status-checking">
-        <span class="dot"></span>
-        <span id="ollama-status-text">Checking Ollama...</span>
+      <div class="topbar-right">
+        <div id="ollama-status-badge" class="status-pill status-checking">
+          <span class="dot"></span>
+          <span id="ollama-status-text">Checking Ollama...</span>
+        </div>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <!-- Main Container -->
-  <div class="main-layout">
+    <!-- Main Container -->
+    <div class="main-layout">
     <!-- Analysis Starter Bar -->
     <section class="analysis-bar-container">
       <div class="analysis-bar">
@@ -70,6 +75,10 @@
             <span id="active-agent-label" class="current-tag">Initializing</span>
           </div>
           <span id="analysis-id-badge" class="text-muted"></span>
+        </div>
+        
+        <div class="pipeline-progress-track">
+          <div id="pipeline-progress-fill" class="pipeline-progress-fill" style="width: 0%"></div>
         </div>
         
         <div class="agents-grid">
@@ -124,51 +133,65 @@
       <!-- 10-Page Sidebar Navigation -->
       <nav class="report-sidebar">
         <div class="sidebar-header">
-          <span class="sidebar-title">10-PAGE BRIEFING</span>
+          <div class="sidebar-header-row">
+            <span class="sidebar-title">Analysis</span>
+            <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Toggle agent list">&#9771;</button>
+          </div>
           <span id="sidebar-project-name" class="sidebar-project"></span>
         </div>
-        <ul class="nav-pages-list">
-          <li class="nav-item active" data-page="1">
-            <span class="page-num">01</span>
-            <span class="page-name">Project Overview</span>
-          </li>
-          <li class="nav-item" data-page="2">
-            <span class="page-num">02</span>
-            <span class="page-name">Repository Map</span>
-          </li>
-          <li class="nav-item" data-page="3">
-            <span class="page-num">03</span>
-            <span class="page-name">Architecture</span>
-          </li>
-          <li class="nav-item" data-page="4">
-            <span class="page-num">04</span>
-            <span class="page-name">Routes & Interfaces</span>
-          </li>
-          <li class="nav-item" data-page="5">
-            <span class="page-num">05</span>
-            <span class="page-name">Execution Flows</span>
-          </li>
-          <li class="nav-item" data-page="6">
-            <span class="page-num">06</span>
-            <span class="page-name">Component Explorer</span>
-          </li>
-          <li class="nav-item" data-page="7">
-            <span class="page-num">07</span>
-            <span class="page-name">Data & Integrations</span>
-          </li>
-          <li class="nav-item" data-page="8">
-            <span class="page-num">08</span>
-            <span class="page-name">Gaps & Issues</span>
-          </li>
-          <li class="nav-item" data-page="9">
-            <span class="page-num">09</span>
-            <span class="page-name">Concepts to Learn</span>
-          </li>
-          <li class="nav-item highlight-item" data-page="10">
-            <span class="page-num">10</span>
-            <span class="page-name">Teacher / Mental Model</span>
-          </li>
-        </ul>
+        <div class="agent-list" id="agent-list">
+          <div class="agent-row" data-agent="Repository Mapper">
+            <span class="agent-dot agent-pending"></span>
+            <div class="agent-row-info">
+              <span class="agent-row-name">Repository Mapper</span>
+              <span class="agent-row-sub">Structure &amp; Tech Stack</span>
+            </div>
+            <span class="agent-row-status">Pending</span>
+          </div>
+          <div class="agent-row" data-agent="Flow Tracer">
+            <span class="agent-dot agent-pending"></span>
+            <div class="agent-row-info">
+              <span class="agent-row-name">Flow Tracer</span>
+              <span class="agent-row-sub">Routes &amp; Workflows</span>
+            </div>
+            <span class="agent-row-status">Pending</span>
+          </div>
+          <div class="agent-row" data-agent="Component Analyst">
+            <span class="agent-dot agent-pending"></span>
+            <div class="agent-row-info">
+              <span class="agent-row-name">Component Analyst</span>
+              <span class="agent-row-sub">Inputs, Outputs &amp; Side-effects</span>
+            </div>
+            <span class="agent-row-status">Pending</span>
+          </div>
+          <div class="agent-row" data-agent="Data Analyst">
+            <span class="agent-dot agent-pending"></span>
+            <div class="agent-row-info">
+              <span class="agent-row-name">Data Analyst</span>
+              <span class="agent-row-sub">DBs, APIs &amp; ML Integration</span>
+            </div>
+            <span class="agent-row-status">Pending</span>
+          </div>
+          <div class="agent-row" data-agent="Gap Analyst">
+            <span class="agent-dot agent-pending"></span>
+            <div class="agent-row-info">
+              <span class="agent-row-name">Gap Analyst</span>
+              <span class="agent-row-sub">Issues &amp; Opportunities</span>
+            </div>
+            <span class="agent-row-status">Pending</span>
+          </div>
+          <div class="agent-row" data-agent="Teacher">
+            <span class="agent-dot agent-pending"></span>
+            <div class="agent-row-info">
+              <span class="agent-row-name">Teacher</span>
+              <span class="agent-row-sub">25-Question Mental Model</span>
+            </div>
+            <span class="agent-row-status">Pending</span>
+          </div>
+        </div>
+        <div class="sidebar-footer">
+          <button id="btn-new-analysis" class="sidebar-action" type="button">+ New analysis</button>
+        </div>
       </nav>
 
       <!-- Page Content Viewer -->
@@ -185,16 +208,49 @@
           </div>
         </div>
 
+        <!-- Folder-style tabs -->
+        <div class="folder-tabs" id="folder-tabs" role="tablist" aria-label="Report sections">
+          <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true">📖 Overview</button>
+          <button class="tab-btn" data-tab="repository-map" role="tab" aria-selected="false">🗂️ Repository Map</button>
+          <button class="tab-btn" data-tab="architecture" role="tab" aria-selected="false">🏛️ Architecture</button>
+          <button class="tab-btn" data-tab="routes" role="tab" aria-selected="false">🔌 Routes</button>
+          <button class="tab-btn" data-tab="flows" role="tab" aria-selected="false">⚡ Flows</button>
+          <button class="tab-btn" data-tab="components" role="tab" aria-selected="false">🧩 Components</button>
+          <button class="tab-btn" data-tab="data" role="tab" aria-selected="false">💾 Data</button>
+          <button class="tab-btn" data-tab="gaps" role="tab" aria-selected="false">⚠️ Gaps</button>
+          <button class="tab-btn" data-tab="learn" role="tab" aria-selected="false">📚 Learn</button>
+          <button class="tab-btn" data-tab="teacher" role="tab" aria-selected="false">🎓 Teacher</button>
+        </div>
+
+        <!-- Filter chips -->
+        <div class="chip-row" id="chip-row" aria-label="Filter findings"></div>
+
+        <!-- Toolbar -->
+        <div class="toolbar-row">
+          <span id="findings-count" class="text-muted">Findings</span>
+          <div class="toolbar-right">
+            <button class="btn btn-secondary btn-sm" id="btn-sort" type="button">Sort: Relevance <span class="sort-caret">▾</span></button>
+          </div>
+        </div>
+
         <!-- Render Target for Active Page -->
         <div id="page-body" class="page-body">
-          <div class="loading-state">
+          <div id="empty-state" class="empty-state">
+            <div class="empty-icon">🧭</div>
+            <h2 class="empty-title">Explore any codebase</h2>
+            <p class="empty-sub">Paste a repository path and Sherlock will map its architecture, flows, components, data, gaps and mental models.</p>
+            <button id="btn-empty-analyze" class="btn btn-primary" type="button">Analyze Codebase</button>
+          </div>
+
+          <div id="loading-state" class="loading-state">
             <div class="spinner"></div>
             <p>Gathering intelligence...</p>
           </div>
         </div>
       </main>
     </div>
-  </div>
+    </div>
+    </div>
 
   <!-- Interactive Code Viewer Modal -->
   <div id="code-modal" class="modal-backdrop hidden">

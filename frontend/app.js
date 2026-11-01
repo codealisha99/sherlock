@@ -10,15 +10,32 @@ let currentPageNumber = 1;
 let pollInterval = null;
 let currentIndexRepo = null;
 let indexPollInterval = null;
+let currentTabId = "overview";
+
+// Folder-style tab -> report page mapping
+const tabPageMap = {
+  "overview": 1,
+  "repository-map": 2,
+  "architecture": 3,
+  "routes": 4,
+  "flows": 5,
+  "components": 6,
+  "data": 7,
+  "gaps": 8,
+  "learn": 9,
+  "teacher": 10,
+};
 
 // DOM Elements
 const btnAnalyze = document.getElementById("btn-analyze");
 const btnIndex = document.getElementById("btn-index");
 const inputProjectPath = document.getElementById("project-path-input");
 const pipelineProgress = document.getElementById("pipeline-progress");
+const pipelineProgressFill = document.getElementById("pipeline-progress-fill");
 const activeAgentLabel = document.getElementById("active-agent-label");
 const analysisIdBadge = document.getElementById("analysis-id-badge");
 const reportContainer = document.getElementById("report-container");
+const agentList = document.getElementById("agent-list");
 const sidebarProjectName = document.getElementById("sidebar-project-name");
 const pageTitle = document.getElementById("page-title");
 const pageSubtitle = document.getElementById("page-subtitle");
@@ -89,8 +106,30 @@ function setupEventListeners() {
   if (btnIndex) {
     btnIndex.addEventListener("click", startIndexing);
   }
+  const btnNewAnalysis = document.getElementById("btn-new-analysis");
+  if (btnNewAnalysis) {
+    btnNewAnalysis.addEventListener("click", startAnalysis);
+  }
   btnPrevPage.addEventListener("click", () => navigateToPage(currentPageNumber - 1));
   btnNextPage.addEventListener("click", () => navigateToPage(currentPageNumber + 1));
+
+  const btnEmptyAnalyze = document.getElementById("btn-empty-analyze");
+  if (btnEmptyAnalyze) {
+    btnEmptyAnalyze.addEventListener("click", startAnalysis);
+  }
+  const sidebarToggle = document.getElementById("sidebar-toggle");
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener("click", () => {
+      const sidebar = document.querySelector(".report-sidebar");
+      if (!sidebar) return;
+      sidebar.classList.toggle("open");
+    });
+  }
+
+  // Folder-style tab navigation
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => setActiveTab(btn.getAttribute("data-tab")));
+  });
 
   // Sidebar item clicks
   document.querySelectorAll(".nav-item").forEach(item => {
@@ -108,6 +147,40 @@ function setupEventListeners() {
 }
 
 // ==============================================================================
+// Agent Status Sidebar
+// ==============================================================================
+
+function resetAgentRows() {
+  if (!agentList) return;
+  agentList.querySelectorAll(".agent-row").forEach(row => {
+    row.classList.remove("active");
+    const dot = row.querySelector(".agent-dot");
+    if (dot) dot.className = "agent-dot agent-pending";
+    const statusEl = row.querySelector(".agent-row-status");
+    if (statusEl) statusEl.textContent = "Pending";
+  });
+}
+
+function setAgentRowStatus(agentName, status) {
+  if (!agentList) return;
+  const rows = Array.from(agentList.querySelectorAll(".agent-row"));
+  const target = rows.find(r => r.getAttribute("data-agent") === agentName);
+  if (!target) return;
+  const dot = target.querySelector(".agent-dot");
+  const statusEl = target.querySelector(".agent-row-status");
+  const running = status === "running";
+  const done = status === "completed";
+  const failed = status === "failed";
+  if (dot) {
+    dot.className = failed ? "agent-dot agent-failed" : done ? "agent-dot agent-done" : running ? "agent-dot agent-running" : "agent-dot agent-pending";
+  }
+  if (statusEl) {
+    statusEl.textContent = status === "completed" ? "Done" : status.charAt(0).toUpperCase() + status.slice(1);
+  }
+  target.classList.toggle("active", running);
+}
+
+// ==============================================================================
 // Analysis Trigger & Polling
 // ==============================================================================
 
@@ -121,12 +194,18 @@ async function startAnalysis() {
   btnAnalyze.disabled = true;
   btnAnalyze.innerHTML = '<span class="spinner" style="width:14px;height:14px;display:inline-block;margin:0 6px 0 0;"></span> Analyzing...';
   pipelineProgress.classList.remove("hidden");
+  // Empty state lives in #page-body, which renderers wipe — re-query each run
+  const emptyEl = document.getElementById("empty-state");
+  const loadingEl = document.getElementById("loading-state");
+  if (emptyEl) emptyEl.classList.add("hidden");
+  if (loadingEl) loadingEl.classList.remove("hidden");
 
   // Reset agent chips
   Object.values(agentChipMap).forEach(chip => {
     chip.className = "agent-chip";
     chip.querySelector(".agent-status-icon").textContent = "⏳";
   });
+  resetAgentRows();
 
   try {
     const res = await fetch("/api/analyze", {
@@ -179,6 +258,7 @@ async function startIndexing() {
     chip.className = "agent-chip";
     chip.querySelector(".agent-status-icon").textContent = "⏳";
   });
+  resetAgentRows();
 
   try {
     const res = await fetch("/api/index", {
@@ -263,6 +343,53 @@ async function pollProgress() {
       else icon.textContent = "⏳";
     }
 
+    // Update sidebar agent rows
+    const statusesNow = progress.agent_statuses || {};
+    agentList.querySelectorAll(".agent-row").forEach(row => {
+      const agentName = row.getAttribute("data-agent");
+      const status = statusesNow[agentName] || "pending";
+      const dot = row.querySelector(".agent-dot");
+      const statusEl = row.querySelector(".agent-row-status");
+      const running = status === "running";
+      const done = status === "completed";
+      const failed = status === "failed";
+      if (dot) {
+        dot.className = failed ? "agent-dot agent-failed" : done ? "agent-dot agent-done" : running ? "agent-dot agent-running" : "agent-dot agent-pending";
+      }
+      if (statusEl) {
+        statusEl.textContent = status === "completed" ? "Done" : status.charAt(0).toUpperCase() + status.slice(1);
+      }
+      row.classList.toggle("active", running);
+    });
+
+    // Slim pipeline progress bar (computed from agent completion state)
+    const agentNames = Object.keys(statusesNow);
+    const totalAgents = agentNames.length || 6;
+    const doneCount = Object.values(statusesNow).filter(s => s === "completed").length;
+    const runningCount = Object.values(statusesNow).filter(s => s === "running").length;
+    let pct = 0;
+    if (progress.status === "completed" || progress.has_report) {
+      pct = 100;
+    } else if (progress.status === "failed") {
+      pct = Math.round((doneCount / totalAgents) * 100);
+    } else if (runningCount > 0) {
+      pct = Math.round((doneCount / totalAgents) * 100);
+    } else {
+      pct = 8; // initializing
+    }
+    if (pipelineProgressFill) pipelineProgressFill.style.width = pct + "%";
+
+    // Show skeleton cards while the pipeline is still running
+    if (progress.status !== "completed" && progress.status !== "failed") {
+      pageBody.innerHTML = `
+        <div class="card-grid">
+          <div class="card skeleton-card"></div>
+          <div class="card skeleton-card"></div>
+          <div class="card skeleton-card"></div>
+        </div>
+      `;
+    }
+
     if (progress.status === "completed" || progress.has_report) {
       clearInterval(pollInterval);
       activeAgentLabel.textContent = "DONE";
@@ -298,6 +425,44 @@ async function loadFullReport(analysisId) {
   }
 }
 
+function populateChips(content) {
+  const chipRow = document.getElementById("chip-row");
+  if (!chipRow) return;
+  chipRow.innerHTML = "";
+  const tags = [];
+  (content.languages || []).forEach(l => tags.push({ label: l, kind: "language" }));
+  (content.frameworks || []).forEach(f => tags.push({ label: f, kind: "framework" }));
+  tags.forEach(t => {
+    const chip = document.createElement("button");
+    chip.className = "chip";
+    chip.type = "button";
+    chip.innerHTML = `<span>${t.label}</span><span class="chip-count">0</span>`;
+    chip.addEventListener("click", () => {
+      chipRow.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+    });
+    chipRow.appendChild(chip);
+  });
+}
+
+function tabForPage(pageNum) {
+  for (const [tabId, page] of Object.entries(tabPageMap)) {
+    if (page === pageNum) return tabId;
+  }
+  return null;
+}
+
+function setActiveTab(tabId) {
+  currentTabId = tabId;
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    const isActive = btn.getAttribute("data-tab") === tabId;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  const pageNum = tabPageMap[tabId];
+  if (pageNum) navigateToPage(pageNum);
+}
+
 function navigateToPage(pageNum) {
   if (!currentReport || pageNum < 1 || pageNum > 10) return;
   currentPageNumber = pageNum;
@@ -307,11 +472,12 @@ function navigateToPage(pageNum) {
   btnNextPage.disabled = (currentPageNumber === 10);
   pageIndicator.textContent = `Page ${currentPageNumber} of 10`;
 
-  // Update sidebar active item
-  document.querySelectorAll(".nav-item").forEach(item => {
-    const num = parseInt(item.getAttribute("data-page"), 10);
-    if (num === currentPageNumber) item.classList.add("active");
-    else item.classList.remove("active");
+  // Sync folder tab state to the active page
+  const activeTabId = tabForPage(currentPageNumber);
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    const isActive = btn.getAttribute("data-tab") === activeTabId;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
   });
 
   const pageData = currentReport.pages.find(p => p.page_number === currentPageNumber);
@@ -325,6 +491,7 @@ function navigateToPage(pageNum) {
 
 function renderPageContent(pageNum, content) {
   pageBody.innerHTML = "";
+  populateChips(content);
 
   switch (pageNum) {
     case 1:
@@ -379,10 +546,10 @@ function renderPage1(c) {
   pageBody.innerHTML = `
     <div class="card">
       <div class="card-title">📖 Core Identity & Purpose</div>
-      <p style="font-size: 1.05rem; margin-bottom: 14px;">${c.summary || ""}</p>
+      <p class="prose-lead">${c.summary || ""}</p>
       <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
         ${(c.languages || []).map(l => `<span class="badge badge-subtle">${l}</span>`).join("")}
-        ${(c.frameworks || []).map(f => `<span class="badge badge-subtle" style="color:var(--accent-green);border-color:var(--accent-green);">${f}</span>`).join("")}
+        ${(c.frameworks || []).map(f => `<span class="badge badge-subtle" style="color:var(--accent-sage-strong);border-color:var(--accent-sage);">${f}</span>`).join("")}
       </div>
     </div>
 
@@ -513,7 +680,7 @@ function renderPage6(c) {
   pageBody.innerHTML = `
     <div class="card">
       <div class="card-title">🧩 Component Explorer</div>
-      <p style="margin-bottom: 16px; color:var(--text-secondary);">Deep inspection of what core classes and modules ACTUALLY do (distinguishing naming from concrete behavior).</p>
+      <p class="prose-lead">Deep inspection of what core classes and modules ACTUALLY do (distinguishing naming from concrete behavior).</p>
 
       ${c.mermaid_graph ? `
         <div class="mermaid" style="background:var(--bg-tertiary); padding:16px; border-radius:6px; margin-bottom:20px; overflow-x:auto;">
@@ -523,30 +690,58 @@ function renderPage6(c) {
 
       <div class="card-grid">
         ${(c.components || []).map(comp => `
-          <div class="card" style="background:var(--bg-tertiary);">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-              <strong style="font-size:1.05rem; color:var(--accent-blue); font-family:var(--font-mono);">${comp.component}</strong>
+          <div class="card pastel-lavender">
+            <div class="card-head">
+              <strong class="strong">${comp.component}</strong>
             </div>
-            <div style="margin-bottom:10px;">
+            <div class="card-file">
               <span class="code-link" onclick="openFileViewer('${comp.file}')">${comp.file}</span>
             </div>
-            <p style="font-size:0.88rem; margin-bottom:12px;"><strong>Responsibility:</strong> ${comp.responsibility}</p>
-            
-            <div style="font-size:0.8rem; margin-bottom:6px;">
-              <span style="color:var(--text-muted);">Inputs:</span> ${(comp.inputs || []).join(", ") || "None"}
-            </div>
-            <div style="font-size:0.8rem; margin-bottom:6px;">
-              <span style="color:var(--text-muted);">Outputs:</span> ${(comp.outputs || []).join(", ") || "None"}
-            </div>
-            <div style="font-size:0.8rem; margin-bottom:6px;">
-              <span style="color:var(--text-muted);">Side Effects:</span> ${(comp.side_effects || []).join(", ") || "None"}
-            </div>
-            <div style="font-size:0.8rem; margin-bottom:6px;">
-              <span style="color:var(--accent-orange);">Assumptions:</span> ${(comp.assumptions || []).join(", ") || "None"}
-            </div>
-            <div style="font-size:0.8rem;">
-              <span style="color:var(--accent-red);">Failure Modes:</span> ${(comp.failure_modes || []).join(", ") || "None"}
-            </div>
+            <p class="card-text"><strong>Responsibility:</strong> ${comp.responsibility}</p>
+            <div class="card-text"><span class="text-muted">Inputs:</span> ${(comp.inputs || []).join(", ") || "None"}</div>
+            <div class="card-text"><span class="text-muted">Outputs:</span> ${(comp.outputs || []).join(", ") || "None"}</div>
+            <div class="card-text"><span class="text-muted">Side Effects:</span> ${(comp.side_effects || []).join(", ") || "None"}</div>
+            <div class="card-text"><span class="text-muted">Assumptions:</span> ${(comp.assumptions || []).join(", ") || "None"}</div>
+            <div class="card-text"><span class="text-muted">Failure Modes:</span> ${(comp.failure_modes || []).join(", ") || "None"}</div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderPage7(c) {
+  pageBody.innerHTML = `
+    <div class="card">
+      <div class="card-title">💾 Data Movement & External Boundaries</div>
+      ${c.mermaid_diagram ? `
+        <div class="mermaid" style="background:var(--bg-tertiary); padding:16px; border-radius:6px; margin-bottom:20px; overflow-x:auto;">
+          ${c.mermaid_diagram}
+        </div>
+      ` : ""}
+
+      <h3 class="section-subtitle">Databases & Storage</h3>
+      <div class="card-grid">
+        ${(c.databases || []).map(db => `
+          <div class="card dir-card">
+            <strong class="strong">${db.name} (${db.type})</strong>
+            <p>${db.purpose}</p>
+            <div class="card-text">ORM/Driver: ${db.orm_or_driver}</div>
+            <div class="card-text">Models/Artifacts: ${(db.tables_or_models || []).join(", ")}</div>
+          </div>
+        `).join("")}
+      </div>
+
+      <h3 class="section-subtitle">External Services & AI/ML Integrations</h3>
+      <div class="card-grid">
+        ${(c.external_services || []).map(s => `
+          <div class="card dir-card">
+            <strong class="strong">${s.name}</strong>
+            <p>${s.purpose}</p>
+            <div class="card-text">Location: <code>${s.call_location}</code></div>
+            <div class="card-text"><strong style="color:var(--accent-orange);">Sent:</strong> ${s.sent_data}</div>
+            <div class="card-text"><strong style="color:var(--accent-green);">Received:</strong> ${s.received_data}</div>
+            <div class="card-text"><strong style="color:var(--accent-red);">Failure Risks:</strong> ${(s.failure_possibilities || []).join("; ")}</div>
           </div>
         `).join("")}
       </div>
@@ -603,24 +798,33 @@ function renderPage8(c) {
     return "gap-improvement";
   };
 
+  const severityClass = (cat) => {
+    const lower = (cat || "").toLowerCase();
+    if (lower.includes("confirmed")) return "gap-critical";
+    if (lower.includes("likely")) return "gap-likely";
+    if (lower.includes("architectural")) return "gap-architectural";
+    if (lower.includes("missing")) return "gap-missing";
+    return "gap-improvement";
+  };
+
   pageBody.innerHTML = `
     <div class="card">
       <div class="card-title">⚠️ Codebase Gaps, Technical Debt & Risks</div>
-      <p style="margin-bottom: 20px; color:var(--text-secondary);">${c.summary || "Evaluated code health, missing validations, test coverage, and architectural bottlenecks."}</p>
+      <p class="prose-lead">${c.summary || "Evaluated code health, missing validations, test coverage, and architectural bottlenecks."}</p>
 
-      <div style="display: flex; flex-direction: column; gap: 14px;">
+      <div class="gap-list">
         ${(c.gaps || []).map(g => `
-          <div class="card" style="background:var(--bg-tertiary); border-left: 4px solid var(--border-color);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div class="card pastel-blush gap-card ${severityClass(g.category)}">
+            <div class="gap-card-head">
               <span class="gap-badge ${categoryClass(g.category)}">${g.category}</span>
-              <span style="font-size:0.75rem; color:var(--text-muted);">Confidence: <strong>${g.confidence}</strong></span>
+              <span class="text-muted">Confidence: <strong>${g.confidence}</strong></span>
             </div>
-            <h3 style="font-size:1.05rem; margin-bottom:6px;">${g.gap}</h3>
-            <p style="font-size:0.88rem; color:var(--text-secondary); margin-bottom:8px;"><strong>Evidence:</strong> <code>${g.evidence}</code></p>
-            <p style="font-size:0.88rem; margin-bottom:8px;"><strong style="color:var(--accent-orange);">Why It Matters:</strong> ${g.why_it_matters}</p>
-            <p style="font-size:0.85rem; margin-bottom:8px;"><strong style="color:var(--accent-red);">Possible Impact:</strong> ${g.possible_impact}</p>
-            <div style="background:var(--bg-secondary); padding:8px 12px; border-radius:4px; font-size:0.85rem; border:1px solid var(--border-color);">
-              <strong style="color:var(--accent-green);">🛠️ Recommended Contribution:</strong> ${g.possible_contribution}
+            <h3 class="gap-title">${g.gap}</h3>
+            <p class="card-text"><strong>Evidence:</strong> <code>${g.evidence}</code></p>
+            <p class="card-text"><strong class="text-warn">Why It Matters:</strong> ${g.why_it_matters}</p>
+            <p class="card-text"><strong class="text-danger">Possible Impact:</strong> ${g.possible_impact}</p>
+            <div class="card gap-action">
+              <strong class="text-ok">🛠️ Recommended Contribution:</strong> ${g.possible_contribution}
             </div>
           </div>
         `).join("")}
@@ -628,6 +832,7 @@ function renderPage8(c) {
     </div>
   `;
 }
+
 
 function renderPage9(c) {
   pageBody.innerHTML = `
@@ -654,28 +859,26 @@ function renderPage10(c) {
   const qaEntries = Object.entries(qa);
 
   pageBody.innerHTML = `
-    <div class="card" style="background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(188, 140, 255, 0.08) 100%);">
-      <div class="card-title" style="color:var(--accent-purple);">🎓 Synthesized Mental Model</div>
-      <p style="font-size:1.05rem; margin-bottom:14px; line-height:1.6;">${c.simple_explanation || ""}</p>
-      <div style="background:var(--bg-tertiary); padding:14px; border-radius:6px; border:1px solid var(--border-color);">
-        <strong style="color:var(--accent-blue);">💼 Interview Walkthrough:</strong>
-        <p style="font-size:0.9rem; margin-top:6px; color:var(--text-secondary);">${c.interview_explanation || ""}</p>
+    <div class="card">
+      <div class="card-title">🎓 Synthesized Mental Model</div>
+      <p class="prose-lead">${c.simple_explanation || ""}</p>
+      <div class="card">
+        <strong>💼 Interview Walkthrough:</strong>
+        <p>${c.interview_explanation || ""}</p>
       </div>
     </div>
 
     <div class="card">
       <div class="card-title">📖 Recommended Reading Order for Developers</div>
-      <div style="display:flex; flex-direction:column; gap:10px;">
+      <div class="reading-list">
         ${(c.first_files_to_read || []).map(f => `
-          <div style="background:var(--bg-tertiary); padding:12px; border-radius:6px; display:flex; align-items:flex-start; gap:12px;">
+          <div class="card dir-card">
             <span class="flow-step-badge">${f.order}</span>
-            <div style="flex:1;">
+            <div>
               <div><span class="code-link" onclick="openFileViewer('${f.file}')">${f.file}</span></div>
-              <p style="font-size:0.85rem; margin-top:4px;">${f.why_read_first}</p>
+              <p>${f.why_read_first}</p>
               ${f.key_symbols_to_watch && f.key_symbols_to_watch.length ? `
-                <div style="font-size:0.78rem; color:var(--accent-blue); margin-top:4px;">
-                  Key symbols: ${f.key_symbols_to_watch.map(s => `<code>${s}</code>`).join(", ")}
-                </div>
+                <div class="text-blue"><strong>Key symbols:</strong> ${f.key_symbols_to_watch.map(s => `<code>${s}</code>`).join(", ")}</div>
               ` : ""}
             </div>
           </div>
@@ -685,11 +888,12 @@ function renderPage10(c) {
 
     <div class="card">
       <div class="card-title">❓ The 25 Core Developer Mental Model Questions</div>
-      <div style="display:flex; flex-direction:column; gap:12px;">
+      <div class="qa-list">
         ${qaEntries.map(([question, answer], idx) => `
-          <div style="background:var(--bg-tertiary); padding:14px; border-radius:6px; border-left:3px solid var(--accent-purple);">
-            <strong style="color:var(--text-primary); font-size:0.92rem; display:block; margin-bottom:6px;">${question}</strong>
-            <p style="font-size:0.88rem; color:var(--text-secondary); line-height:1.5;">${answer}</p>
+          <div class="card pastel-lavender qa-card">
+            <span class="qa-num">${idx + 1}</span>
+            <strong>${question}</strong>
+            <p>${answer}</p>
           </div>
         `).join("")}
       </div>
