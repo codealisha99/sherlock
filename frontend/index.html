@@ -26,25 +26,27 @@
   </script>
 </head>
 <body>
-  <!-- Top Navigation Header -->
-  <header class="app-header">
-    <div class="header-left">
-      <div class="logo">
-        <span class="magnifier">🔍</span>
-        <span class="logo-title">SHERLOCK</span>
-        <span class="badge badge-subtle">V1.0 ARCHITECTURE EXPLORER</span>
+  <!-- Single rounded panel shell -->
+  <div class="app-shell">
+    <!-- Top Bar -->
+    <header class="app-header">
+      <div class="topbar-left">
+        <div class="logo">
+          <span class="magnifier">🔍</span>
+          <span class="logo-title">SHERLOCK</span>
+          <span class="badge badge-subtle">V1.0 Architecture Explorer</span>
+        </div>
       </div>
-    </div>
-    <div class="header-right">
-      <div id="ollama-status-badge" class="status-pill status-checking">
-        <span class="dot"></span>
-        <span id="ollama-status-text">Checking Ollama...</span>
+      <div class="topbar-right">
+        <div id="ollama-status-badge" class="status-pill status-checking">
+          <span class="dot"></span>
+          <span id="ollama-status-text">Checking Ollama...</span>
+        </div>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <!-- Main Container -->
-  <div class="main-layout">
+    <!-- Main Container -->
+    <div class="main-layout">
     <!-- Analysis Starter Bar -->
     <section class="analysis-bar-container">
       <div class="analysis-bar">
@@ -197,7 +199,8 @@
         </div>
       </main>
     </div>
-  </div>
+    </div>
+    </div>
 
   <!-- Interactive Code Viewer Modal -->
   <div id="code-modal" class="modal-backdrop hidden">
