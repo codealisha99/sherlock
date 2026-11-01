@@ -84,7 +84,8 @@ class TestAPIHandler(unittest.TestCase):
         self.assertEqual(status, 200)
         content = body.decode("utf-8")
         self.assertIn("SHERLOCK", content)
-        self.assertIn("10-PAGE BRIEFING", content)
+        self.assertIn("sidebar-title", content)
+        self.assertIn("agent-list", content)
 
     def test_analyze_trigger_with_ai(self):
         """Analyze endpoint starts analysis when AI is enabled."""
