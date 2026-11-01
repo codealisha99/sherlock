@@ -81,6 +81,10 @@
 
 body {
   background-color: var(--bg-primary);
+  background-image:
+    radial-gradient(1100px 750px at 88% -12%, rgba(124, 154, 109, 0.10), transparent 62%),
+    radial-gradient(950px 700px at -8% 112%, rgba(176, 167, 208, 0.12), transparent 60%);
+  background-attachment: fixed;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -89,6 +93,19 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* Single rounded panel shell: top bar + workspace + sidebar/main live inside */
+.app-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
 }
 
 /* Design tokens only — no hard-coded colors in components (see :root above) */
@@ -105,18 +122,31 @@ code {
   font-family: var(--font-mono);
 }
 
-/* Header */
+/* Top Bar */
 .app-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 24px;
+  padding: 14px 28px;
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
-.header-left .logo {
+.topbar-left, .topbar-right {
+  display: flex;
+  align-items: center;
+}
+
+.topbar-left {
+  justify-content: flex-start;
+}
+
+.topbar-right {
+  justify-content: flex-end;
+}
+
+.topbar-left .logo {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -150,7 +180,7 @@ code {
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  border-radius: 16px;
+  border-radius: var(--radius-chip);
   font-size: 0.8rem;
   font-weight: 500;
   background-color: var(--bg-tertiary);
@@ -172,6 +202,7 @@ code {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -364,6 +395,7 @@ code {
 .report-layout {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
