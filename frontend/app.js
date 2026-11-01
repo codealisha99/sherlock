@@ -117,6 +117,14 @@ function setupEventListeners() {
   if (btnEmptyAnalyze) {
     btnEmptyAnalyze.addEventListener("click", startAnalysis);
   }
+  const sidebarToggle = document.getElementById("sidebar-toggle");
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener("click", () => {
+      const sidebar = document.querySelector(".report-sidebar");
+      if (!sidebar) return;
+      sidebar.classList.toggle("open");
+    });
+  }
 
   // Folder-style tab navigation
   document.querySelectorAll(".tab-btn").forEach(btn => {
