@@ -730,6 +730,142 @@ code {
   font-size: 0.7em;
 }
 
+/* Content typography helpers */
+.prose-lead {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+  margin-bottom: 14px;
+}
+
+/* Badges */
+.badge-sage {
+  background: var(--pastel-sage);
+  color: var(--accent-sage-strong);
+  border: 1px solid var(--pastel-sage-border);
+}
+
+/* Directory map cards */
+.dir-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.dir-card {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  padding: 12px;
+  margin-bottom: 0;
+}
+
+.dir-key-files {
+  margin-top: 6px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* Finding / detail card internals */
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.card-head .strong {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: var(--text-primary);
+}
+
+.card-file {
+  margin-bottom: 10px;
+}
+
+.card-text {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.card-text strong {
+  color: var(--text-primary);
+}
+
+/* Pastel finding card variants (owner-agent accent) */
+.card.pastel-sage { background-color: var(--pastel-sage); border-color: var(--pastel-sage-border); }
+.card.pastel-lavender { background-color: var(--pastel-lavender); border-color: var(--pastel-lavender-border); }
+.card.pastel-butter { background-color: var(--pastel-butter); border-color: var(--pastel-butter-border); }
+.card.pastel-blush { background-color: var(--pastel-blush); border-color: var(--pastel-blush-border); }
+.card.pastel-sand { background-color: var(--pastel-sand); border-color: var(--pastel-sand-border); }
+.card.pastel-sky { background-color: var(--pastel-sky); border-color: var(--pastel-sky-border); }
+.card.pastel-peach { background-color: var(--pastel-peach); border-color: var(--pastel-peach-border); }
+
+.text-ok { color: var(--accent-green); }
+.text-warn { color: var(--accent-orange); }
+.text-danger { color: var(--accent-red); }
+.text-blue { color: var(--accent-blue); }
+
+/* Gap cards with severity accent */
+.gap-card {
+  border-left: 4px solid var(--accent-red);
+}
+
+.gap-card.gap-critical { border-left-color: var(--accent-red); }
+.gap-card.gap-likely { border-left-color: var(--accent-orange); }
+.gap-card.gap-architectural { border-left-color: var(--accent-purple); }
+.gap-card.gap-missing { border-left-color: var(--accent-blue); }
+.gap-card.gap-improvement { border-left-color: var(--accent-green); }
+
+.gap-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.gap-title {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.gap-action {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+/* Teacher question cards */
+.qa-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.qa-card {
+  position: relative;
+  padding-top: 16px;
+}
+
+.qa-num {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 /* Flow Step Card */
 .flow-step-item {
   display: flex;
@@ -815,7 +951,7 @@ code {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(42, 38, 33, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -825,13 +961,13 @@ code {
 .modal-dialog {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   width: 80%;
   max-width: 900px;
   height: 75vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 10px 30px rgba(42, 38, 33, 0.25);
 }
 
 .modal-header {
@@ -867,7 +1003,8 @@ code {
   font-family: var(--font-mono);
   font-size: 0.85rem;
   line-height: 1.45;
-  color: #e6edf3;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
   white-space: pre-wrap;
   word-break: break-all;
 }
