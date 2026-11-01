@@ -1028,9 +1028,60 @@ code {
 }
 
 .loading-state {
+  display: none;
   text-align: center;
   padding: 60px 20px;
   color: var(--text-secondary);
+}
+
+/* Empty state */
+.empty-state {
+  display: none;
+  text-align: center;
+  padding: 90px 32px;
+}
+
+.empty-icon {
+  font-size: 2.6rem;
+  margin-bottom: 14px;
+}
+
+.empty-title {
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.empty-sub {
+  max-width: 480px;
+  margin: 0 auto 26px;
+  font-size: 0.95rem;
+}
+
+/* Skeleton cards */
+.skeleton-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  height: 150px;
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 253, 248, 0.9), transparent);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
 }
 
 /* ========================================================================
