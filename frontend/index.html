@@ -205,6 +205,31 @@
           </div>
         </div>
 
+        <!-- Folder-style tabs -->
+        <div class="folder-tabs" id="folder-tabs" role="tablist" aria-label="Report sections">
+          <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true">📖 Overview</button>
+          <button class="tab-btn" data-tab="repository-map" role="tab" aria-selected="false">🗂️ Repository Map</button>
+          <button class="tab-btn" data-tab="architecture" role="tab" aria-selected="false">🏛️ Architecture</button>
+          <button class="tab-btn" data-tab="routes" role="tab" aria-selected="false">🔌 Routes</button>
+          <button class="tab-btn" data-tab="flows" role="tab" aria-selected="false">⚡ Flows</button>
+          <button class="tab-btn" data-tab="components" role="tab" aria-selected="false">🧩 Components</button>
+          <button class="tab-btn" data-tab="data" role="tab" aria-selected="false">💾 Data</button>
+          <button class="tab-btn" data-tab="gaps" role="tab" aria-selected="false">⚠️ Gaps</button>
+          <button class="tab-btn" data-tab="learn" role="tab" aria-selected="false">📚 Learn</button>
+          <button class="tab-btn" data-tab="teacher" role="tab" aria-selected="false">🎓 Teacher</button>
+        </div>
+
+        <!-- Filter chips -->
+        <div class="chip-row" id="chip-row" aria-label="Filter findings"></div>
+
+        <!-- Toolbar -->
+        <div class="toolbar-row">
+          <span id="findings-count" class="text-muted">Findings</span>
+          <div class="toolbar-right">
+            <button class="btn btn-secondary btn-sm" id="btn-sort" type="button">Sort: Relevance <span class="sort-caret">▾</span></button>
+          </div>
+        </div>
+
         <!-- Render Target for Active Page -->
         <div id="page-body" class="page-body">
           <div class="loading-state">

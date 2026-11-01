@@ -630,6 +630,106 @@ code {
   margin-bottom: 20px;
 }
 
+/* Folder-style tabs */
+.folder-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 12px 32px;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--bg-primary);
+}
+
+.tab-btn {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.tab-btn:hover {
+  background-color: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-subtle);
+  border-bottom: 1px solid var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* Filter chips */
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px 32px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background-color: var(--pastel-sand);
+  border: 1px solid var(--pastel-sand-border);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.chip:hover {
+  background-color: var(--pastel-butter);
+}
+
+.chip.active {
+  background-color: var(--pastel-butter);
+  border-color: var(--pastel-butter-dot);
+}
+
+.chip-count {
+  font-size: 0.7rem;
+  background-color: rgba(42, 38, 33, 0.08);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+/* Toolbar */
+.toolbar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 32px 16px;
+}
+
+.findings-count {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.toolbar-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sort-caret {
+  font-size: 0.7em;
+}
+
 /* Flow Step Card */
 .flow-step-item {
   display: flex;

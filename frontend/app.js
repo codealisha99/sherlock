@@ -10,6 +10,21 @@ let currentPageNumber = 1;
 let pollInterval = null;
 let currentIndexRepo = null;
 let indexPollInterval = null;
+let currentTabId = "overview";
+
+// Folder-style tab -> report page mapping
+const tabPageMap = {
+  "overview": 1,
+  "repository-map": 2,
+  "architecture": 3,
+  "routes": 4,
+  "flows": 5,
+  "components": 6,
+  "data": 7,
+  "gaps": 8,
+  "learn": 9,
+  "teacher": 10,
+};
 
 // DOM Elements
 const btnAnalyze = document.getElementById("btn-analyze");
@@ -97,6 +112,11 @@ function setupEventListeners() {
   }
   btnPrevPage.addEventListener("click", () => navigateToPage(currentPageNumber - 1));
   btnNextPage.addEventListener("click", () => navigateToPage(currentPageNumber + 1));
+
+  // Folder-style tab navigation
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => setActiveTab(btn.getAttribute("data-tab")));
+  });
 
   // Sidebar item clicks
   document.querySelectorAll(".nav-item").forEach(item => {
@@ -376,6 +396,44 @@ async function loadFullReport(analysisId) {
   }
 }
 
+function populateChips(content) {
+  const chipRow = document.getElementById("chip-row");
+  if (!chipRow) return;
+  chipRow.innerHTML = "";
+  const tags = [];
+  (content.languages || []).forEach(l => tags.push({ label: l, kind: "language" }));
+  (content.frameworks || []).forEach(f => tags.push({ label: f, kind: "framework" }));
+  tags.forEach(t => {
+    const chip = document.createElement("button");
+    chip.className = "chip";
+    chip.type = "button";
+    chip.innerHTML = `<span>${t.label}</span><span class="chip-count">0</span>`;
+    chip.addEventListener("click", () => {
+      chipRow.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+    });
+    chipRow.appendChild(chip);
+  });
+}
+
+function tabForPage(pageNum) {
+  for (const [tabId, page] of Object.entries(tabPageMap)) {
+    if (page === pageNum) return tabId;
+  }
+  return null;
+}
+
+function setActiveTab(tabId) {
+  currentTabId = tabId;
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    const isActive = btn.getAttribute("data-tab") === tabId;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  const pageNum = tabPageMap[tabId];
+  if (pageNum) navigateToPage(pageNum);
+}
+
 function navigateToPage(pageNum) {
   if (!currentReport || pageNum < 1 || pageNum > 10) return;
   currentPageNumber = pageNum;
@@ -385,11 +443,12 @@ function navigateToPage(pageNum) {
   btnNextPage.disabled = (currentPageNumber === 10);
   pageIndicator.textContent = `Page ${currentPageNumber} of 10`;
 
-  // Update sidebar active item
-  document.querySelectorAll(".nav-item").forEach(item => {
-    const num = parseInt(item.getAttribute("data-page"), 10);
-    if (num === currentPageNumber) item.classList.add("active");
-    else item.classList.remove("active");
+  // Sync folder tab state to the active page
+  const activeTabId = tabForPage(currentPageNumber);
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    const isActive = btn.getAttribute("data-tab") === activeTabId;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
   });
 
   const pageData = currentReport.pages.find(p => p.page_number === currentPageNumber);
@@ -403,6 +462,7 @@ function navigateToPage(pageNum) {
 
 function renderPageContent(pageNum, content) {
   pageBody.innerHTML = "";
+  populateChips(content);
 
   switch (pageNum) {
     case 1:
