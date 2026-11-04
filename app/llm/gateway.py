@@ -32,6 +32,7 @@ from app.llm.models import (
     LLMProvider,
     TokenUsage,
 )
+from app.llm.ollama_client import OllamaClient
 from app.llm.providers.groq_provider import GroqProvider, GroqRateLimitError
 from app.llm.providers.ollama_provider import OllamaProvider
 from app.llm.quota_manager import QuotaManager
