@@ -21,7 +21,6 @@ Usage example:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import time
 from typing import Any, AsyncGenerator, Dict, Optional
@@ -70,8 +69,28 @@ class LLMGateway:
       - Streaming with accurate TTFT measurement.
     """
 
-    def __init__(self, sherlock_cfg: Optional[SherlockConfig] = None):
+    def __init__(
+        self,
+        sherlock_cfg: Optional[SherlockConfig] = None,
+        override_provider: Optional[LLMProvider] = None,
+    ):
+        """
+        Args:
+            override_provider: BYOK mode. Every call goes to this provider, with
+                no platform quota reservation and no usage tracking (the user
+                pays their own provider). Platform providers are not initialised.
+        """
         self.cfg = sherlock_cfg or config
+        self._providers: Dict[str, LLMProvider] = {}
+        self._default_provider: Optional[str] = None
+        self._override = override_provider
+        self._lock = __import__("threading").Lock()
+        if override_provider is not None:
+            self._quota: Optional[QuotaManager] = None
+            self._tracker: Optional[UsageTracker] = None
+            self._providers[override_provider.name] = override_provider
+            self._default_provider = override_provider.name
+            return
         self._quota = QuotaManager(
             db_path=self.cfg.llm_quota_db_path,
             daily_request_budget=int(self.cfg.llm_daily_request_budget),
@@ -81,10 +100,7 @@ class LLMGateway:
             max_concurrent_requests=int(self.cfg.llm_max_concurrent_requests),
         )
         self._tracker = UsageTracker(self._quota)
-        self._providers: Dict[str, LLMProvider] = {}
-        self._default_provider: Optional[str] = None
         self._initialize_providers()
-        self._lock = __import__("threading").Lock()
 
     # ------------------------------------------------------------------ #
     # Provider initialization
@@ -141,7 +157,7 @@ class LLMGateway:
         Checks budget before calling the provider. Reserves max_output_tokens
         (plus estimated input) and reconciles actual usage afterward.
         """
-        provider = self._get_provider(request.model and self._provider_for_model(request.model))
+        provider = self._select_provider(request)
         return self._generate_with_quota(provider, request, stream=False)
 
     async def generate_stream(
@@ -152,10 +168,15 @@ class LLMGateway:
         Yields text chunks as they arrive. TTFT is measured against the first
         non-empty generated chunk, not the first SSE status event.
         """
-        provider = self._get_provider(request.model and self._provider_for_model(request.model))
+        provider = self._select_provider(request)
         agen = self._generate_with_quota(provider, request, stream=True)
         async for chunk in agen:
             yield chunk
+
+    def _select_provider(self, request: GenerationRequest) -> LLMProvider:
+        if self._override is not None:
+            return self._override
+        return self._get_provider(request.model and self._provider_for_model(request.model))
 
     def _provider_for_model(self, model: Optional[str]) -> Optional[str]:
         """If a specific model is requested, pick a provider that supports it."""
@@ -175,6 +196,8 @@ class LLMGateway:
         request: GenerationRequest,
         stream: bool,
     ) -> Any:
+        if self._quota is None:
+            return self._generate_unmetered(provider, request, stream)
         # Estimate input tokens for admission.
         estimated_input = provider.estimate_tokens(request.to_prompt())
         max_output = request.max_output_tokens or int(self.cfg.llm_max_output_tokens)
@@ -233,6 +256,19 @@ class LLMGateway:
                 status_code=502,
             ) from exc
 
+    def _generate_unmetered(self, provider: LLMProvider, request: GenerationRequest, stream: bool) -> Any:
+        """BYOK path: the caller's own key pays, so no platform budget applies."""
+        if stream:
+            return self._stream_unmetered(provider, request)
+        return provider.generate(request)
+
+    async def _stream_unmetered(self, provider: LLMProvider, request: GenerationRequest):
+        # Same chunk contract as the metered path: TTFT marker stripped, errors passed through.
+        async for chunk in provider.generate_stream(request):
+            if chunk.startswith("__ttft__:"):
+                continue
+            yield chunk
+
     # ------------------------------------------------------------------ #
     # Streaming with reconcile
     # ------------------------------------------------------------------ #
@@ -246,6 +282,7 @@ class LLMGateway:
         t0: float,
     ):
         """Async generator that streams chunks and reconciles at the end."""
+        start_wall = time.time()
         accumulated = ""
         ttft_ms: Optional[float] = None
         error_category: Optional[str] = None
@@ -433,7 +470,8 @@ class LLMGateway:
         return name in self._providers
 
     def close(self) -> None:
-        self._quota.close()
+        if self._quota is not None:
+            self._quota.close()
         for p in self._providers.values():
             try:
                 p.close()
