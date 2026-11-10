@@ -17,6 +17,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from config import config
 from app.saas.llm_platform import resolve_gateway
+from app.saas.db import get_store
 from app.saas.router import auth_required, consume_chat_quota
 from app.orchestrator.orchestrator import Orchestrator
 from app.analysis.context import AnalysisContext
@@ -90,7 +91,14 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                 health = self.orchestrator.llm.check_health()
             else:
                 health = {"available": False, "ai_enabled": False}
-            self._send_json({"status": "ok", "ollama": health})
+            try:
+                get_store().ping()
+            except Exception:
+                # A deploy that can't reach the account DB must fail its healthcheck.
+                logger.exception("Health check: account database unreachable")
+                self._send_json({"status": "error", "db": "unavailable"}, 503)
+                return
+            self._send_json({"status": "ok", "db": "ok", "ollama": health})
             return
 
         # 1b. Model-free: list indexed repositories

@@ -7,14 +7,18 @@ import pytest
 from scripts import build_vercel
 
 
+SECRET = "e" * 40
+
+
 def test_bundle_layout_and_config(tmp_path, monkeypatch):
     monkeypatch.setattr(build_vercel, "OUT", tmp_path / "out")
+    monkeypatch.setenv("SHERLOCK_EDGE_SECRET", SECRET)
     out = build_vercel.build("https://api.example.up.railway.app")
     index = (out / "index.html").read_text()
     assert "landing.js" in index and "app.js" in (out / "app.html").read_text()
     cfg = json.loads((out / "vercel.json").read_text())
     rewrites = {r["source"]: r["destination"] for r in cfg["rewrites"]}
-    assert rewrites["/api/:path*"] == "https://api.example.up.railway.app/api/:path*"
+    assert rewrites["/api/:path*"] == f"https://api.example.up.railway.app/_edge/{SECRET}/api/:path*"
     assert rewrites["/login"] == "/auth" and rewrites["/signup"] == "/auth"
     assert not any(d.endswith(".html") for d in rewrites.values())  # cleanUrls would 404
     keys = {h["key"] for h in cfg["headers"][0]["headers"]}
@@ -25,3 +29,10 @@ def test_bundle_layout_and_config(tmp_path, monkeypatch):
 def test_rejects_non_https_or_pathful_backend(bad):
     with pytest.raises(SystemExit):
         build_vercel._backend_origin(bad)
+
+
+@pytest.mark.parametrize("secret", ["", "short", "has spaces " * 4])
+def test_refuses_to_build_without_a_strong_edge_secret(monkeypatch, secret):
+    monkeypatch.setenv("SHERLOCK_EDGE_SECRET", secret)
+    with pytest.raises(SystemExit):
+        build_vercel._edge_secret()

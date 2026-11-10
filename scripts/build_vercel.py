@@ -6,12 +6,18 @@ index.html and the workspace becomes app.html (cleanUrls maps /app to it).
 (cookies + CSRF checks work unchanged). Security headers come from
 app.saas.security so the Python server and Vercel can never drift.
 
-Usage: python scripts/build_vercel.py https://<backend>.up.railway.app
+Usage: SHERLOCK_EDGE_SECRET=<same value as on Railway> \
+       python scripts/build_vercel.py https://<backend>.up.railway.app
+
+The edge secret becomes a path prefix on the /api rewrite so the backend can
+tell proxied requests (whose client IP it can trust) from direct ones.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -35,14 +41,21 @@ def _backend_origin(raw: str) -> str:
     return f"https://{parsed.netloc}"
 
 
-def vercel_config(backend: str) -> dict:
+def _edge_secret() -> str:
+    secret = os.getenv("SHERLOCK_EDGE_SECRET", "")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{32,}", secret):
+        raise SystemExit("SHERLOCK_EDGE_SECRET must be set (32+ URL-safe chars, same as on Railway)")
+    return secret
+
+
+def vercel_config(backend: str, edge_secret: str) -> dict:
     headers = [{"key": k, "value": v} for k, v in (*STATIC_SECURITY_HEADERS, HSTS)]
     return {
         "$schema": "https://openapi.vercel.sh/vercel.json",
         "cleanUrls": True,
         "trailingSlash": False,
         "rewrites": [
-            {"source": "/api/:path*", "destination": f"{backend}/api/:path*"},
+            {"source": "/api/:path*", "destination": f"{backend}/_edge/{edge_secret}/api/:path*"},
             # cleanUrls: files are addressed without ".html" (a ".html" destination 404s).
             {"source": "/login", "destination": "/auth"},
             {"source": "/signup", "destination": "/auth"},
@@ -58,13 +71,14 @@ def vercel_config(backend: str) -> dict:
 
 def build(backend_url: str) -> Path:
     backend = _backend_origin(backend_url)
+    edge_secret = _edge_secret()
     if OUT.exists():
         shutil.rmtree(OUT)
     OUT.mkdir(parents=True)
     for path in SRC.iterdir():
         if path.is_file():
             shutil.copy2(path, OUT / RENAMES.get(path.name, path.name))
-    (OUT / "vercel.json").write_text(json.dumps(vercel_config(backend), indent=2) + "\n")
+    (OUT / "vercel.json").write_text(json.dumps(vercel_config(backend, edge_secret), indent=2) + "\n")
     return OUT
 
 

@@ -16,8 +16,10 @@ Middleware order for every /api request:
 
 from __future__ import annotations
 
+import hmac
 import importlib
 import io
+import ipaddress
 import json
 import logging
 import os
@@ -105,7 +107,53 @@ def match_route(method: str, path: str) -> Optional[Tuple[str, Dict[str, str], b
 
 
 # ----------------------------------------------------------------- transport
+EDGE_PREFIX = "/_edge/"
+# Reachable without the edge secret: the platform health check probes Railway directly.
+EDGE_EXEMPT = {"/api/health"}
+
+
+def _admit_edge(handler: Any) -> bool:
+    """Gate /api/* behind the Vercel rewrite when SHERLOCK_EDGE_SECRET is set.
+
+    Vercel rewrites /api/x to /_edge/<secret>/api/x on Railway; the browser never
+    sees that URL and vercel.json is not served. Only such requests are trusted
+    to carry the real client IP (X-Vercel-Proxied-For). Returns False when the
+    request was rejected (response already sent).
+    """
+    handler.via_edge = False
+    secret = os.getenv("SHERLOCK_EDGE_SECRET", "")
+    if not secret:
+        return True  # local dev / no proxy in front
+    if handler.path.startswith(EDGE_PREFIX):
+        given, sep, tail = handler.path[len(EDGE_PREFIX):].partition("/")
+        if sep and hmac.compare_digest(given.encode(), secret.encode()):
+            handler.path = "/" + tail
+            handler.via_edge = True
+            return True
+        _error(handler, HTTPError(404, "Not found"))
+        return False
+    path = urlparse(handler.path).path
+    if path.startswith("/api/") and path not in EDGE_EXEMPT:
+        _error(handler, HTTPError(404, "Not found"))
+        return False
+    return True
+
+
+def _valid_ip(raw: str) -> Optional[str]:
+    try:
+        return str(ipaddress.ip_address(raw.strip()))
+    except ValueError:
+        return None
+
+
 def _client_ip(handler: Any) -> str:
+    if getattr(handler, "via_edge", False):
+        # Vercel overwrites X-Vercel-Proxied-For with the connecting client's IP
+        # (verified: a client-supplied value is replaced). X-Vercel-Forwarded-For
+        # and X-Forwarded-For pass client values through and must not be used.
+        ip = _valid_ip(handler.headers.get("X-Vercel-Proxied-For", ""))
+        if ip:
+            return ip
     if os.getenv("SHERLOCK_TRUST_PROXY", "").lower() == "true":
         fwd = handler.headers.get("X-Forwarded-For", "")
         if fwd:
@@ -271,6 +319,8 @@ def _rate_limit(bucket: str, key: str) -> None:
 # ------------------------------------------------------------------- entry
 def process(handler: Any, method: str) -> bool:
     """Run middleware + SaaS dispatch. True => response already sent."""
+    if not _admit_edge(handler):
+        return True
     parsed = urlparse(handler.path)
     path = parsed.path
     if not path.startswith("/api/"):

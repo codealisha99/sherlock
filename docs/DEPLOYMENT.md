@@ -23,7 +23,8 @@ browser ──► Vercel (static frontend, CDN)
 | `SHERLOCK_SECRET_KEY` | random 48+ bytes. **Never rotate casually**: it encrypts stored BYOK keys; changing it makes them undecryptable (users must re-enter keys) |
 | `SHERLOCK_AUTH_REQUIRED` | `true` |
 | `SHERLOCK_COOKIE_SECURE` | `true` |
-| `SHERLOCK_TRUST_PROXY` | `true` (Vercel overwrites `X-Forwarded-For` with the real client IP) |
+| `SHERLOCK_EDGE_SECRET` | random 32+ URL-safe chars (`python -c 'import secrets;print(secrets.token_urlsafe(32))'`). Vercel's `/api` rewrite targets `/_edge/<secret>/api/…`; with it set, `/api/*` (except `/api/health`) is 404 when hit directly, and the client IP is taken from `X-Vercel-Proxied-For` (overwritten by Vercel, so not spoofable) |
+| `SHERLOCK_TRUST_PROXY` | `true` (fallback client-IP source for non-edge requests) |
 | `SHERLOCK_DATA_DIR` | `/data` |
 | `SHERLOCK_DB_POOL_MAX` | `5` |
 | `SHERLOCK_ALLOWED_ORIGINS` | the Vercel production origin (CSRF check: browser Origin is Vercel, Host is Railway) |
@@ -37,14 +38,15 @@ browser ──► Vercel (static frontend, CDN)
 # backend
 railway up --ci --service api
 
-# frontend (BACKEND = the Railway public origin)
-python scripts/build_vercel.py https://api-production-cb158.up.railway.app
+# frontend (BACKEND = the Railway public origin; the edge secret is baked into vercel.json)
+SHERLOCK_EDGE_SECRET=$(railway variables --service api --kv | sed -n 's/^SHERLOCK_EDGE_SECRET=//p') \
+  python scripts/build_vercel.py https://api-production-cb158.up.railway.app
 cd dist/vercel && vercel link --yes --project sherlock && vercel deploy --prod --yes
 ```
 
 ## Live URLs
 - App: https://sherlock-blush.vercel.app
-- API origin (also reachable directly): https://api-production-cb158.up.railway.app
+- API origin (direct access serves only `/api/health`; everything else goes through Vercel): https://api-production-cb158.up.railway.app
 - Railway region: `asia-southeast1-eqsg3a` (Singapore), same region as Neon `aws-ap-southeast-1`
 
 ## Gotchas hit during the first deploy
@@ -59,9 +61,15 @@ cd dist/vercel && vercel link --yes --project sherlock && vercel deploy --prod -
 - **Variables set with `--skip-deploys`** are not seen by the running container; redeploy.
 - **Vercel `cleanUrls`:** rewrite destinations must not end in `.html` (they 404).
 
+Rotating `SHERLOCK_EDGE_SECRET`: set it on Railway, redeploy the backend, then rebuild and
+redeploy Vercel. Between the two steps `/api` returns 404 through Vercel.
+
 ## Notes / limits
-- Single Railway replica: rate limits and job threads are in-process, and the SQLite index lives on one volume. Scale-out needs a shared rate-limit store and moving the index to Postgres + pgvector.
-- The Railway origin is also publicly reachable. Requests that bypass Vercel can spoof `X-Forwarded-For`, which only weakens per-IP rate limits; per-user limits and login lockout still apply.
+- Single Railway replica: rate limits and job threads are in-process, and the SQLite index lives on one volume. Scale-out needs a shared rate-limit store, a real job queue and moving the index to Postgres + pgvector.
+- Analysis jobs run in-process. On startup, any job still `queued`/`running` is marked failed ("Interrupted by a server restart"), because its thread died with the previous container. Correct only with one replica.
+- Analysis quota is charged when a job **succeeds**; in-flight jobs count toward the monthly limit at submit, so concurrent submits can't overshoot it.
+- `/api/health` runs `SELECT 1` against the account DB and returns 503 if it fails. The server also refuses to start (exits after the 30 s pool timeout) when the DB is unreachable, so a deploy that can't reach Neon is never promoted.
+- Volume: ~5-6 MB per analysis. Watch `/data` usage in the Railway dashboard; no automatic cleanup yet.
 - Image is ~2.3 GB (CPU torch + baked embedding model); the model loads offline (`HF_HUB_OFFLINE=1`).
 - Postgres integration tests: create a throwaway Neon branch and run
   `SHERLOCK_TEST_DATABASE_URL=<branch url> pytest tests/test_saas_db_postgres.py`.
