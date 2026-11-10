@@ -201,7 +201,7 @@ def test_unexpected_error_hides_internals(store, owner, tmp_path):
     assert str(tmp_path) not in job["error"]
 
 
-def test_start_ingest_accepts_and_records_usage(store, owner, monkeypatch):
+def test_start_ingest_accepts_without_charging_quota_until_success(store, owner, monkeypatch):
     dispatched: List[tuple] = []
     monkeypatch.setattr(ir, "_dispatch", lambda *a: dispatched.append(a))
     resp = ir.start_ingest(_req(_user(owner), {"url": "https://github.com/octo/demo.git"}))
@@ -210,7 +210,8 @@ def test_start_ingest_accepts_and_records_usage(store, owner, monkeypatch):
     assert "user_id" not in job and job["status"] == "queued"
     assert job["github_url"] == URL
     assert dispatched and dispatched[0][0] == job["id"]
-    assert store.count_usage_since(owner["id"], EVENT_ANALYSIS, datetime.now(timezone.utc) - timedelta(days=1)) == 1
+    # Charged on success (see test_success_is_charged_and_failure_is_free), not on submit.
+    assert store.count_usage_since(owner["id"], EVENT_ANALYSIS, datetime.now(timezone.utc) - timedelta(days=1)) == 0
 
 
 def test_start_ingest_rejects_bad_url(store, owner):
@@ -313,3 +314,55 @@ def test_missing_artifacts_return_404(store, owner):
     with pytest.raises(HTTPError) as exc:
         ir.get_graph(_req(_user(owner), path_params={"repo_id": repo_id}, method="GET"))
     assert exc.value.status == 404
+
+
+
+def _month_usage(store, user_id):
+    return store.count_usage_since(user_id, EVENT_ANALYSIS, datetime.now(timezone.utc) - timedelta(days=1))
+
+
+def test_restart_recovery_unblocks_user_and_refunds_quota(store, owner, monkeypatch):
+    """Reproduces the production failure: 2 jobs orphaned by a restart blocked the user forever."""
+    monkeypatch.setattr(ir, "_dispatch", lambda *a: None)  # jobs never run: simulates the killed process
+    for _ in range(2):
+        assert ir.start_ingest(_req(_user(owner), {"url": URL})).status == 202
+    with pytest.raises(HTTPError) as exc:
+        ir.start_ingest(_req(_user(owner), {"url": URL}))
+    assert exc.value.status == 429  # blocked, as observed
+
+    assert ir.recover_interrupted_jobs() == 2
+    jobs = store.list_jobs(owner["id"])
+    assert {j["status"] for j in jobs} == {"failed"} and all(j["error"] == ir.INTERRUPTED for j in jobs)
+    assert _month_usage(store, owner["id"]) == 0  # interrupted runs cost nothing
+    assert ir.start_ingest(_req(_user(owner), {"url": URL})).status == 202  # unblocked
+
+
+def test_in_flight_jobs_count_toward_monthly_quota(store, owner, monkeypatch):
+    monkeypatch.setattr(ir, "_dispatch", lambda *a: None)
+    store.record_usage(owner["id"], EVENT_ANALYSIS)  # free plan: 3/month; 1 completed
+    ir.start_ingest(_req(_user(owner), {"url": URL}))
+    ir.start_ingest(_req(_user(owner), {"url": URL}))  # 1 completed + 2 in flight = 3
+    with pytest.raises(HTTPError) as exc:
+        ir.start_ingest(_req(_user(owner), {"url": URL}))
+    assert exc.value.status == 402  # quota is checked before the active-job cap
+
+
+def _no_audit(path, files):
+    return [], {"scanned": 0, "vulnerable": 0, "ecosystems": [], "manifests": [], "error": None}
+
+
+def test_success_is_charged_and_failure_is_free(store, owner, tmp_path):
+    ok = store.create_job(owner["id"], URL)
+    ir.run_job(ok["id"], owner["id"], "octo", "demo", None, URL, 50, cloner=_fake_cloner(),
+               indexer=None, embed=False, repos_dir=tmp_path / "repos", audit=_no_audit)
+    assert store.get_job(ok["id"])["status"] == "done"
+    assert _month_usage(store, owner["id"]) == 1
+
+    def broken_cloner(*_a, **_k):
+        raise RuntimeError("boom")
+
+    bad = store.create_job(owner["id"], URL)
+    ir.run_job(bad["id"], owner["id"], "octo", "demo", None, URL, 50, cloner=broken_cloner,
+               indexer=None, embed=False, repos_dir=tmp_path / "repos2", audit=_no_audit)
+    assert store.get_job(bad["id"])["status"] == "failed"
+    assert _month_usage(store, owner["id"]) == 1

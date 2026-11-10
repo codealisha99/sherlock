@@ -221,6 +221,10 @@ class SaasStore:
         with self._conn() as c:
             return c.execute(self._engine.sql(sql), args).rowcount
 
+    def ping(self) -> None:
+        """Raise if the account database is unreachable (used by /api/health)."""
+        self._one("SELECT 1 AS ok")
+
     # ------------------------------------------------------------------ users
     def create_user(self, email: str, password_hash: str) -> Dict[str, Any]:
         user_id = uuid.uuid4().hex
@@ -370,6 +374,15 @@ class SaasStore:
         return self._one(
             "SELECT 1 AS ok FROM ingest_jobs WHERE user_id = ? AND analysis_id = ?", (user_id, analysis_id)
         ) is not None
+
+    def fail_interrupted_jobs(self, message: str) -> int:
+        """Mark every queued/running job failed. Call once at startup: jobs run in-process,
+        so after a restart none of them can still be running (single replica)."""
+        return self._exec(
+            "UPDATE ingest_jobs SET status = 'failed', stage = 'failed', error = ?, updated_at = ? "
+            "WHERE status IN ('queued', 'running')",
+            (message, iso(utc_now())),
+        )
 
     def count_active_jobs(self, user_id: str) -> int:
         row = self._one(

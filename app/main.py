@@ -780,6 +780,9 @@ def run_server(host: str, port: int, auto_open: bool = False, enable_ai: bool = 
     logger.info("AI model source at startup: %s", describe_model_source(enable_ai))
 
     server_address = (host, port)
+    from app.saas.ingest_routes import recover_interrupted_jobs
+
+    recover_interrupted_jobs()
     httpd = ThreadingHTTPServer(server_address, SherlockRequestHandler)
 
     url = f"http://{host}:{port}" if host != "0.0.0.0" else f"http://localhost:{port}"

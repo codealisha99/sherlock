@@ -155,6 +155,9 @@ def _run_stages(
         },
         "summary": summary,
     }
+    # Charge the analysis only once it succeeds. Record before marking done so the
+    # quota check never sees it as neither in-flight nor used.
+    store.record_usage(user_id, EVENT_ANALYSIS)
     store.update_job(job_id, status="done", stage="done", progress=100, repo_id=repo_id, result=result)
     return result
 
@@ -193,6 +196,18 @@ def run_job(
             logger.exception("Could not record failure for job %s", job_id)
 
 
+INTERRUPTED = "Interrupted by a server restart. Please run the analysis again."
+
+
+def recover_interrupted_jobs() -> int:
+    """Fail jobs orphaned by the previous process (deploy/crash) so users are not
+    blocked by the active-job cap and the UI stops polling them forever."""
+    count = get_store().fail_interrupted_jobs(INTERRUPTED)
+    if count:
+        logger.warning("Marked %d interrupted analysis job(s) as failed after restart", count)
+    return count
+
+
 def _log_worker_crash(fut: "Future[None]") -> None:
     exc = fut.exception()
     if exc is not None:
@@ -215,8 +230,10 @@ def start_ingest(req: Request) -> Response:
     limits = plan_limits(user.get("plan", "free"))
     store = get_store()
     with _quota_lock:
+        # Completed analyses this month + ones in flight: failed/interrupted runs are free,
+        # but concurrent submissions still cannot exceed the plan.
         used = store.count_usage_since(user["id"], EVENT_ANALYSIS, _month_start())
-        if used >= limits["analyses_per_month"]:
+        if used + store.count_active_jobs(user["id"]) >= limits["analyses_per_month"]:
             raise HTTPError(
                 402,
                 f"Monthly analysis limit reached ({limits['analyses_per_month']} on the "
@@ -225,7 +242,6 @@ def start_ingest(req: Request) -> Response:
         if store.count_active_jobs(user["id"]) >= MAX_ACTIVE_JOBS:
             raise HTTPError(429, f"You already have {MAX_ACTIVE_JOBS} analyses running. Wait for one to finish.")
         job = store.create_job(user["id"], canonical)
-        store.record_usage(user["id"], EVENT_ANALYSIS)
     try:
         _dispatch(job["id"], user["id"], owner, repo, branch, canonical, limits["max_repo_mb"])
     except Exception:
