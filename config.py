@@ -118,7 +118,10 @@ class SherlockConfig(BaseModel):
 
     # Index storage
     index_db_path: Path = Field(
-        default_factory=lambda: Path(__file__).resolve().parent / "index" / "sherlock.db"
+        default_factory=lambda: Path(
+            os.getenv("SHERLOCK_INDEX_DB")
+            or Path(__file__).resolve().parent / "index" / "sherlock.db"
+        )
     )
 
     # Ignored directories

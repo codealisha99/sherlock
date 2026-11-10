@@ -6,3 +6,6 @@ __pycache__/
 workspace/analysis_*
 index/
 results/
+workspace/repos/
+workspace/analyses/
+

@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from app.saas.prompt_guard import sanitize_retrieved_context
 from app.storage import IndexStore
 
 logger = logging.getLogger(__name__)
@@ -227,12 +228,14 @@ def format_context_for_prompt(bundle: ContextBundle) -> str:
     """Format a ContextBundle into a plain-text context block for the LLM.
 
     Each source is prefixed with its source ID (e.g. [S1]) and includes
-    file path and line range. Source metadata is never truncated.
+    file path and line range. Source metadata is never truncated. Content is
+    sanitized and the whole block is fenced in <context>...</context> as
+    untrusted data.
     """
     if not bundle.sources:
         return ""
 
-    lines: List[str] = []
+    lines: List[str] = ["<context>"]
     for s in bundle.sources:
         header = f"[{s.source_id}] {s.file_path}"
         if s.start_line and s.end_line:
@@ -240,8 +243,9 @@ def format_context_for_prompt(bundle: ContextBundle) -> str:
         elif s.start_line:
             header += f":{s.start_line}"
         lines.append(f"{header}:")
-        lines.append(s.content)
+        lines.append(sanitize_retrieved_context(s.content))
         lines.append("")  # blank line between sources
+    lines.append("</context>")
 
     return "\n".join(lines)
 
