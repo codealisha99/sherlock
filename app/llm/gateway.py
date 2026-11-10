@@ -26,6 +26,7 @@ import time
 from typing import Any, AsyncGenerator, Dict, Optional
 
 from app.llm.models import (
+    parse_error_marker,
     GenerationRequest,
     GenerationResult,
     LLMProvider,
@@ -297,9 +298,7 @@ class LLMGateway:
                     ttft_ms = float(chunk.split(":", 1)[1].split("__", 1)[0])
                     continue
                 if chunk.startswith("__error__:"):
-                    import json
-
-                    payload = json.loads(chunk[len("__error__:") : -2])
+                    payload = parse_error_marker(chunk)
                     error_message = payload.get("message", "Stream error")
                     error_category = payload.get("error_category", "provider")
                     success = False

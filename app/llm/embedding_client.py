@@ -12,6 +12,7 @@ after the model has been downloaded and cached.
 from __future__ import annotations
 
 import logging
+import threading
 import math
 from typing import List, Optional
 
@@ -57,6 +58,7 @@ class EmbeddingClient:
         self._model: Optional[SentenceTransformer] = None
         self._model_loaded = False
         self._load_error: Optional[str] = None
+        self._load_lock = threading.Lock()
 
     # ------------------------------------------------------------------ #
     # Model lifecycle
@@ -68,13 +70,22 @@ class EmbeddingClient:
         cannot be loaded.
         """
         if self._model_loaded:
-            if self._load_error is not None:
-                raise EmbeddingError(self._load_error)
-            assert self._model is not None
-            return self._model
+            return self._loaded_model()
+        with self._load_lock:  # one load per client even under concurrent requests
+            if self._model_loaded:
+                return self._loaded_model()
+            try:
+                return self._load_model()
+            finally:
+                self._model_loaded = True
 
-        self._model_loaded = True
+    def _loaded_model(self) -> SentenceTransformer:
+        if self._load_error is not None:
+            raise EmbeddingError(self._load_error)
+        assert self._model is not None
+        return self._model
 
+    def _load_model(self) -> SentenceTransformer:
         if not _SENTENCE_TRANSFORMERS_AVAILABLE:
             self._load_error = (
                 "sentence-transformers is not installed. Install it with: "
@@ -222,6 +233,7 @@ class EmbeddingClient:
 # Module-level convenience instance (uses global config)
 # ---------------------------------------------------------------------- #
 _default_client: Optional[EmbeddingClient] = None
+_default_lock = threading.Lock()
 
 
 def get_default_client() -> EmbeddingClient:
@@ -231,9 +243,10 @@ def get_default_client() -> EmbeddingClient:
     model is loaded lazily on first embed call.
     """
     global _default_client
-    if _default_client is None:
-        _default_client = EmbeddingClient()
-    return _default_client
+    with _default_lock:
+        if _default_client is None:
+            _default_client = EmbeddingClient()
+        return _default_client
 
 
 def embed_text(text: str) -> List[float]:

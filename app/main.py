@@ -741,6 +741,17 @@ def _run_ollama_analyze(project_dir: str):
     return 0
 
 
+def describe_model_source(enable_ai: bool) -> str:
+    """Human-readable model source for the startup log. Never includes key material."""
+    from app.saas.llm_platform import platform_model_name
+
+    name = platform_model_name()
+    parts = [f"platform model {name}" if name else "no platform model (users need BYOK keys)"]
+    if enable_ai:
+        parts.append("legacy Ollama enabled (--enable-ai)")
+    return "; ".join(parts)
+
+
 def run_server(host: str, port: int, auto_open: bool = False, enable_ai: bool = False):
     """Run the multi-threaded HTTP web server.
 
@@ -762,9 +773,11 @@ def run_server(host: str, port: int, auto_open: bool = False, enable_ai: bool = 
         SherlockRequestHandler.gateway = gateway
     else:
         orchestrator = None
-        SherlockRequestHandler.gateway = None
+        # Legacy Groq key without --enable-ai still gives a usable hosted model.
+        SherlockRequestHandler.gateway = LLMGateway() if config.llm_groq_api_key else None
     SherlockRequestHandler.orchestrator = orchestrator
     SherlockRequestHandler.enable_ai = enable_ai
+    logger.info("AI model source at startup: %s", describe_model_source(enable_ai))
 
     server_address = (host, port)
     httpd = ThreadingHTTPServer(server_address, SherlockRequestHandler)

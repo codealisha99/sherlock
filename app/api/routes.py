@@ -13,10 +13,11 @@ import threading
 import asyncio
 from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from config import config
-from app.saas.router import consume_chat_quota
+from app.saas.llm_platform import resolve_gateway
+from app.saas.router import auth_required, consume_chat_quota
 from app.orchestrator.orchestrator import Orchestrator
 from app.analysis.context import AnalysisContext
 from app.indexer import RepositoryIndexer
@@ -503,8 +504,13 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             finally:
                 indexer.store.close()
 
+            gateway, _ = _chat_gateway(self)
+            if gateway is None and auth_required():
+                self._send_json(NO_MODEL_BODY, 409)
+                return
+
             try:
-                pipeline = RAGPipeline(indexer=indexer, gateway=_gateway_for(getattr(self, "saas_user", None), getattr(self, "gateway", None)))
+                pipeline = RAGPipeline(indexer=indexer, gateway=gateway)
                 result = pipeline.ask(
                     repo_id=repo_id,
                     question=question,
@@ -583,6 +589,11 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             finally:
                 indexer.store.close()
 
+            gateway, _ = _chat_gateway(self)
+            if gateway is None and auth_required():
+                self._send_json(NO_MODEL_BODY, 409)
+                return
+
             # Set SSE headers
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -592,7 +603,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
 
             from app.rag.pipeline import RAGPipeline
 
-            pipeline = RAGPipeline(indexer=indexer, gateway=_gateway_for(getattr(self, "saas_user", None), getattr(self, "gateway", None)))
+            pipeline = RAGPipeline(indexer=indexer, gateway=gateway)
 
             def _send_event(event: Dict[str, Any]) -> None:
                 """Send a single SSE event."""
@@ -692,6 +703,16 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                 self._send_error_json(str(exc), 400)
                 return
 
+            # Model check and focus context come before quota and SSE headers, so a
+            # request that cannot be answered costs nothing and gets a clean 409.
+            gateway, _ = _chat_gateway(self)
+            if gateway is None and auth_required():
+                self._send_json(NO_MODEL_BODY, 409)
+                return
+            from app.saas.focus_context import build_focus_context
+
+            focus_chunks = build_focus_context(repo_id, focus) if focus else []
+
             user = getattr(self, "saas_user", None)
             if user is not None:
                 limit_error = consume_chat_quota(user)
@@ -711,7 +732,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
 
             from app.rag.pipeline import RAGPipeline
 
-            pipeline = RAGPipeline(indexer=indexer, gateway=_gateway_for(user, getattr(self, "gateway", None)))
+            pipeline = RAGPipeline(indexer=indexer, gateway=gateway)
             pipeline_question = _focused_question(question, focus)
 
             def _send_event(event: Dict[str, Any]) -> None:
@@ -733,6 +754,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                         question=pipeline_question,
                         retrieval_method=retrieval_method,
                         limit=limit,
+                        extra_context=focus_chunks or None,
                     )
                     full_answer = ""
                     citation_list = []
@@ -845,8 +867,11 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
 # --------------------------------------------------------------------------- #
 # Chat helpers (SaaS): node focus, per-plan quota, BYOK gateway selection.
 # --------------------------------------------------------------------------- #
-_FOCUS_PATH_RE = re.compile(r"^[\w./@+-]{1,300}$")
-_FOCUS_SYMBOL_RE = re.compile(r"^[A-Za-z_][\w.]{0,200}$")
+# No whitespace/quotes/brackets: these values reach the prompt. `$?!` cover JS ($el) and
+# Ruby (valid?, save!) identifiers that tree-sitter emits.
+_FOCUS_PATH_RE = re.compile(r"^[\w./@+$-]{1,300}$")
+_FOCUS_SYMBOL_RE = re.compile(r"^[A-Za-z_$][\w.$?!]{0,200}$")
+_FOCUS_NODE_RE = re.compile(r"^(file|sym):[\w./@+:$?!-]{1,300}$")
 
 
 def _parse_focus(raw: Any) -> Optional[Dict[str, str]]:
@@ -860,6 +885,8 @@ def _parse_focus(raw: Any) -> Optional[Dict[str, str]]:
     node_id = raw.get("node_id") or ""
     if not all(isinstance(v, str) for v in (file_path, symbol, node_id)):
         raise ValueError("'focus' fields must be strings")
+    if node_id and not _FOCUS_NODE_RE.match(node_id):
+        raise ValueError("Invalid focus node_id")
     kind, _, rest = node_id.partition(":")
     if kind == "file":
         file_path = file_path or rest
@@ -873,7 +900,7 @@ def _parse_focus(raw: Any) -> Optional[Dict[str, str]]:
         raise ValueError("Invalid focus symbol")
     if not file_path and not symbol:
         return None
-    return {"file_path": file_path, "symbol": symbol}
+    return {"file_path": file_path, "symbol": symbol, "node_id": node_id}
 
 
 def _focused_question(question: str, focus: Optional[Dict[str, str]]) -> str:
@@ -884,14 +911,19 @@ def _focused_question(question: str, focus: Optional[Dict[str, str]]) -> str:
     return f"{question}\n\n(Focus on: {target})"
 
 
-def _gateway_for(user: Optional[Dict[str, Any]], default: Any) -> Any:
-    """Prefer the user's own API key (BYOK); fall back to the platform gateway."""
-    if user is None:
-        return default
-    try:
-        from app.saas.byok import gateway_for_user
+NO_MODEL_BODY = {
+    "error": "No AI model is configured. Add your own API key in Settings.",
+    "code": "no_model",
+}
 
-        return gateway_for_user(user["id"]) or default
-    except Exception:
-        logger.exception("BYOK gateway construction failed; using platform gateway")
-        return default
+
+def _chat_gateway(handler: Any) -> Tuple[Any, Optional[str]]:
+    """BYOK key, then platform model, then legacy handler gateway (see llm_platform).
+
+    Single-user local dev (auth off, no user) keeps the legacy gateway unchanged.
+    """
+    user = getattr(handler, "saas_user", None)
+    legacy = getattr(handler, "gateway", None)
+    if user is None and not auth_required():
+        return legacy, "legacy"
+    return resolve_gateway(user, legacy, allow_ollama=bool(getattr(handler, "enable_ai", False)))

@@ -15,15 +15,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import sys
 import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from app.indexer import RepositoryIndexer
-from app.llm.embedding_client import EmbeddingClient
+from app.llm.embedding_client import EmbeddingClient, get_default_client
 from app.llm.ollama_client import OllamaClient
 from app.llm.gateway import LLMGateway
+from app.llm.models import parse_error_marker
 from app.rag.citation_validator import Citation, extract_citation_ids, validate_citations
 from app.rag.context_builder import (
     ChunkSource,
@@ -68,6 +70,40 @@ class RAGResult:
 # --------------------------------------------------------------------------- #
 
 
+_AUTH_STATUS_RE = re.compile(r"HTTP (401|403)\b")
+
+
+def _friendly_provider_error(payload: Dict[str, Any]) -> str:
+    """User-facing text for a provider error marker. Never includes key material.
+
+    Provider messages come from OpenAICompatibleProvider._describe, which already
+    strips URLs, headers and bodies, so the message itself is safe to show.
+    """
+    message = str(payload.get("message") or "The model provider returned an error.")
+    match = _AUTH_STATUS_RE.search(message)
+    if match:
+        return f"The AI provider rejected the API key ({match.group(1)}). If you added your own key, check it in Settings; otherwise try again later."
+    if payload.get("error_category") == "rate_limit":
+        return "The model provider is rate limiting requests. Try again shortly."
+    return message
+
+
+def _merge_extra_context(
+    extra: Optional[List[Dict[str, Any]]],
+    retrieved: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Put caller-supplied chunks first, dropping retrieved chunks with the same id.
+
+    Chunks without an id are dropped: context assembly cites chunks by id.
+    Returns `retrieved` unchanged when there is no extra context.
+    """
+    if not extra:
+        return retrieved
+    usable = [c for c in extra if c.get("id")]
+    extra_ids = {c["id"] for c in usable}
+    return [*usable, *(r for r in retrieved if r.get("id") not in extra_ids)]
+
+
 class RAGPipeline:
     """End-to-end grounded question-answering pipeline.
 
@@ -88,7 +124,7 @@ class RAGPipeline:
     ):
         self.indexer = indexer
         self.store = indexer.store
-        self.embedding_client = embedding_client or EmbeddingClient()
+        self.embedding_client = embedding_client or get_default_client()
         self.ollama_client = ollama_client or OllamaClient()
         self.gateway = gateway
         self.tracer = tracer or get_tracer()
@@ -106,6 +142,7 @@ class RAGPipeline:
         question: str,
         retrieval_method: str = "hybrid",
         limit: int = 10,
+        extra_context: Optional[List[Dict[str, Any]]] = None,
     ) -> RAGResult:
         """Answer a question using grounded RAG.
 
@@ -187,6 +224,7 @@ class RAGPipeline:
             retrieval_latency_ms = (time.monotonic() - retrieval_start) * 1000
             metadata.retrieval_latency_ms = round(retrieval_latency_ms, 2)
 
+            raw_results = _merge_extra_context(extra_context, raw_results)
             if not raw_results:
                 result.abstained = True
                 result.abstention_reason = (
@@ -333,6 +371,7 @@ class RAGPipeline:
         question: str,
         retrieval_method: str = "hybrid",
         limit: int = 10,
+        extra_context: Optional[List[Dict[str, Any]]] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream a RAG answer incrementally, yielding events as they occur.
 
@@ -462,6 +501,7 @@ class RAGPipeline:
                 "elapsed_ms": round((time.monotonic() - t0) * 1000, 2),
             }
 
+            raw_results = _merge_extra_context(extra_context, raw_results)
             if not raw_results:
                 yield {
                     "type": "done",
@@ -620,10 +660,7 @@ class RAGPipeline:
                         if chunk.startswith("__ttft__:"):
                             continue
                         if chunk.startswith("__error__:"):
-                            import json
-
-                            payload = json.loads(chunk[len("__error__:") : -2])
-                            raise RuntimeError(payload.get("message", "Stream error"))
+                            raise RuntimeError(_friendly_provider_error(parse_error_marker(chunk)))
                         accumulated_answer += chunk
                         token_count += 1
                         yield {

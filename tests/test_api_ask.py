@@ -281,7 +281,7 @@ class TestAPIAsk(unittest.TestCase):
     def test_ask_pipeline_error(self):
         """Pipeline error returns 500 when EmbeddingClient fails to initialize."""
         with patch("app.api.routes.RepositoryIndexer", return_value=_FakeIndexer()):
-            with patch("app.rag.pipeline.EmbeddingClient") as mock_embed_class:
+            with patch("app.rag.pipeline.get_default_client") as mock_embed_class:
                 mock_embed_class.side_effect = RuntimeError("Model not found")
 
                 payload = json.dumps({

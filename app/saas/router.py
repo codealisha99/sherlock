@@ -248,6 +248,17 @@ def consume_chat_quota(user: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _require_model(handler: Any, user: Dict[str, Any]) -> None:
+    """Refuse before spending quota when no model can answer (same as chat route)."""
+    from app.saas.llm_platform import resolve_gateway
+
+    gateway, _ = resolve_gateway(
+        user, getattr(handler, "gateway", None), allow_ollama=bool(getattr(handler, "enable_ai", False))
+    )
+    if gateway is None:
+        raise HTTPError(409, "No AI model is configured. Add your own API key in Settings.")
+
+
 def _rate_limit(bucket: str, key: str) -> None:
     from app.saas.ratelimit import check
 
@@ -304,6 +315,7 @@ def process(handler: Any, method: str) -> bool:
         _enforce_legacy_policy(path, user, scope)
         _screen_question(scope["question"])
         if path in CHAT_PATHS and user is not None:
+            _require_model(handler, user)
             limit_error = consume_chat_quota(user)
             if limit_error:
                 raise HTTPError(402, limit_error)

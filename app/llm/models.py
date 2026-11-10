@@ -150,3 +150,22 @@ class LLMProvider(Protocol):
     def close(self) -> None:
         """Release provider resources."""
         ...
+
+
+ERROR_MARKER_PREFIX = "__error__:"
+
+
+def parse_error_marker(chunk: str) -> Dict[str, Any]:
+    """Decode a stream error marker of the form ``__error__:{json}__\\n``.
+
+    Never raises: a malformed marker becomes a generic provider error.
+    """
+    import json
+
+    body = chunk[len(ERROR_MARKER_PREFIX):].rstrip("\n")
+    body = body[:-2] if body.endswith("__") else body
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        return {"message": "The model provider returned an error.", "error_category": "provider"}
+    return payload if isinstance(payload, dict) else {"message": str(payload), "error_category": "provider"}
