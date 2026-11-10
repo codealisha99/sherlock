@@ -1,1155 +1,457 @@
 /**
- * Sherlock Frontend Application Controller
- * Handles analysis triggering, agent progress polling, 10-page document navigation,
- * and code inspection modal.
+ * Sherlock workspace (/app): auth gate, start screen, job progress, repo workspace shell.
+ * Load order (index.html): util.js, api.js, node-panel.js, graph.js, findings.js,
+ * chat.js, report.js, app.js. Every module exposes init* functions called from boot().
  */
 
-let currentAnalysisId = null;
-let currentReport = null;
-let currentPageNumber = 1;
-let pollInterval = null;
-let currentIndexRepo = null;
-let indexPollInterval = null;
-let currentTabId = "overview";
-
-// Folder-style tab -> report page mapping
-const tabPageMap = {
-  "overview": 1,
-  "repository-map": 2,
-  "architecture": 3,
-  "routes": 4,
-  "flows": 5,
-  "components": 6,
-  "data": 7,
-  "gaps": 8,
-  "learn": 9,
-  "teacher": 10,
+const POLL_INTERVAL_MS = 1500;
+const STAGES = ["cloning", "indexing", "embedding", "scanning", "graphing", "done"];
+const STAGE_LABELS = {
+  cloning: "Cloning",
+  indexing: "Indexing",
+  embedding: "Embedding",
+  scanning: "Scanning",
+  graphing: "Graphing",
+  done: "Done",
 };
 
-// DOM Elements
-const btnAnalyze = document.getElementById("btn-analyze");
-const btnIndex = document.getElementById("btn-index");
-const inputProjectPath = document.getElementById("project-path-input");
-const pipelineProgress = document.getElementById("pipeline-progress");
-const pipelineProgressFill = document.getElementById("pipeline-progress-fill");
-const activeAgentLabel = document.getElementById("active-agent-label");
-const analysisIdBadge = document.getElementById("analysis-id-badge");
-const reportContainer = document.getElementById("report-container");
-const agentList = document.getElementById("agent-list");
-const sidebarProjectName = document.getElementById("sidebar-project-name");
-const pageTitle = document.getElementById("page-title");
-const pageSubtitle = document.getElementById("page-subtitle");
-const pageIndicator = document.getElementById("page-indicator");
-const pageBody = document.getElementById("page-body");
-const btnPrevPage = document.getElementById("btn-prev-page");
-const btnNextPage = document.getElementById("btn-next-page");
-const ollamaStatusBadge = document.getElementById("ollama-status-badge");
-const ollamaStatusText = document.getElementById("ollama-status-text");
-
-// Modal Elements
-const codeModal = document.getElementById("code-modal");
-const modalFilepath = document.getElementById("modal-filepath");
-const modalCodeContent = document.getElementById("modal-code-content");
-const btnCloseModal = document.getElementById("btn-close-modal");
-
-// Agent Chip Mapping
-const agentChipMap = {
-  "Repository Mapper": document.getElementById("chip-mapper"),
-  "Flow Tracer": document.getElementById("chip-flows"),
-  "Component Analyst": document.getElementById("chip-components"),
-  "Data Analyst": document.getElementById("chip-data"),
-  "Gap Analyst": document.getElementById("chip-gaps"),
-  "Teacher": document.getElementById("chip-teacher"),
+const appEls = {
+  globalError: document.getElementById("global-error"),
+  authLoading: document.getElementById("auth-loading"),
+  userEmail: document.getElementById("user-email"),
+  planBadge: document.getElementById("plan-badge"),
+  logout: document.getElementById("btn-logout"),
+  views: {
+    start: document.getElementById("view-start"),
+    progress: document.getElementById("view-progress"),
+    workspace: document.getElementById("view-workspace"),
+  },
+  analyzeForm: document.getElementById("analyze-form"),
+  urlInput: document.getElementById("repo-url-input"),
+  analyzeBtn: document.getElementById("btn-analyze"),
+  analyzeError: document.getElementById("analyze-error"),
+  repoList: document.getElementById("repo-list"),
+  reposEmpty: document.getElementById("repos-empty"),
+  jobList: document.getElementById("job-list"),
+  jobsEmpty: document.getElementById("jobs-empty"),
+  progressUrl: document.getElementById("progress-url"),
+  stepper: document.getElementById("stage-stepper"),
+  progressTrack: document.getElementById("progress-track"),
+  progressFill: document.getElementById("progress-fill"),
+  progressStatus: document.getElementById("progress-status"),
+  progressError: document.getElementById("progress-error"),
+  progressErrorText: document.getElementById("progress-error-text"),
+  retryBtn: document.getElementById("btn-retry"),
+  backFromProgress: document.getElementById("btn-back-start"),
+  repoName: document.getElementById("repo-name"),
+  repoUrl: document.getElementById("repo-url"),
+  repoScore: document.getElementById("repo-score"),
+  severityRow: document.getElementById("severity-counts"),
+  backToRepos: document.getElementById("btn-back-repos"),
+  wsTabs: Array.from(document.querySelectorAll(".ws-tab")),
+  panels: {
+    graph: document.getElementById("panel-graph"),
+    findings: document.getElementById("panel-findings"),
+    report: document.getElementById("panel-report"),
+  },
+  tabReport: document.getElementById("tab-report"),
 };
 
-// ==============================================================================
-// Initialization & Health Check
-// ==============================================================================
+const progressState = { jobId: null, timer: null, githubUrl: "" };
+const listState = { jobs: [] };
 
-window.addEventListener("DOMContentLoaded", () => {
-  checkOllamaHealth();
-  setupEventListeners();
-});
+document.addEventListener("DOMContentLoaded", boot);
 
-async function checkOllamaHealth() {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
+function boot() {
+  initGraph();
+  initNodePanel();
+  initFindings();
+  initChat();
+  initReport();
 
+  appEls.analyzeForm.addEventListener("submit", onAnalyzeSubmit);
+  appEls.retryBtn.addEventListener("click", retryAnalysis);
+  appEls.backFromProgress.addEventListener("click", backToStart);
+  appEls.backToRepos.addEventListener("click", backToStart);
+  appEls.logout.addEventListener("click", logout);
+  appEls.wsTabs.forEach((tab) => {
+    tab.addEventListener("click", () => showWorkspaceTab(tab.dataset.view));
+  });
+  checkSession();
+}
+
+function showGlobalError(message) {
+  appEls.globalError.textContent = message || "";
+  appEls.globalError.classList.toggle("hidden", !message);
+}
+
+function showView(name) {
+  Object.entries(appEls.views).forEach(([key, node]) => node.classList.toggle("hidden", key !== name));
+}
+
+// ---------------------------------------------------------------------------
+// Auth gate
+// ---------------------------------------------------------------------------
+
+function currentRepoParam() {
+  return new URLSearchParams(location.search).get("repo") || "";
+}
+
+function redirectToLogin() {
+  const repo = currentRepoParam();
+  const next = "/app" + (repo ? `?repo=${encodeURIComponent(repo)}` : "");
+  location.replace(`/login?next=${encodeURIComponent(next)}`);
+}
+
+async function checkSession() {
+  let session;
   try {
-    const res = await fetch("/api/health", { signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (!res.ok) throw new Error("Health check failed");
-    const data = await res.json();
-    const ollama = data.ollama;
-
-    if (ollama && ollama.available) {
-      ollamaStatusBadge.className = "status-pill status-connected";
-      ollamaStatusText.textContent = `Ollama: ${ollama.configured_model}`;
-    } else {
-      ollamaStatusBadge.className = "status-pill status-offline";
-      ollamaStatusText.textContent = "Ollama: Offline (Static Mode Active)";
-    }
+    session = await API.me();
   } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === "AbortError") {
-      ollamaStatusBadge.className = "status-pill status-offline";
-      ollamaStatusText.textContent = "Ollama: Health check timed out";
-    } else {
-      ollamaStatusBadge.className = "status-pill status-offline";
-      ollamaStatusText.textContent = "Ollama: Offline (Static Mode Active)";
+    if (err.status === 401) {
+      redirectToLogin();
+      return;
     }
-  }
-}
-
-function setupEventListeners() {
-  btnAnalyze.addEventListener("click", startAnalysis);
-  if (btnIndex) {
-    btnIndex.addEventListener("click", startIndexing);
-  }
-  const btnNewAnalysis = document.getElementById("btn-new-analysis");
-  if (btnNewAnalysis) {
-    btnNewAnalysis.addEventListener("click", startAnalysis);
-  }
-  btnPrevPage.addEventListener("click", () => navigateToPage(currentPageNumber - 1));
-  btnNextPage.addEventListener("click", () => navigateToPage(currentPageNumber + 1));
-
-  const btnEmptyAnalyze = document.getElementById("btn-empty-analyze");
-  if (btnEmptyAnalyze) {
-    btnEmptyAnalyze.addEventListener("click", startAnalysis);
-  }
-  const sidebarToggle = document.getElementById("sidebar-toggle");
-  if (sidebarToggle) {
-    sidebarToggle.addEventListener("click", () => {
-      const sidebar = document.querySelector(".report-sidebar");
-      if (!sidebar) return;
-      sidebar.classList.toggle("open");
-    });
-  }
-
-  // Folder-style tab navigation
-  document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.addEventListener("click", () => setActiveTab(btn.getAttribute("data-tab")));
-  });
-
-  // Sidebar item clicks
-  document.querySelectorAll(".nav-item").forEach(item => {
-    item.addEventListener("click", () => {
-      const pageNum = parseInt(item.getAttribute("data-page"), 10);
-      navigateToPage(pageNum);
-    });
-  });
-
-  // Modal close
-  btnCloseModal.addEventListener("click", () => codeModal.classList.add("hidden"));
-  codeModal.addEventListener("click", (e) => {
-    if (e.target === codeModal) codeModal.classList.add("hidden");
-  });
-}
-
-// ==============================================================================
-// Agent Status Sidebar
-// ==============================================================================
-
-function resetAgentRows() {
-  if (!agentList) return;
-  agentList.querySelectorAll(".agent-row").forEach(row => {
-    row.classList.remove("active");
-    const dot = row.querySelector(".agent-dot");
-    if (dot) dot.className = "agent-dot agent-pending";
-    const statusEl = row.querySelector(".agent-row-status");
-    if (statusEl) statusEl.textContent = "Pending";
-  });
-}
-
-function setAgentRowStatus(agentName, status) {
-  if (!agentList) return;
-  const rows = Array.from(agentList.querySelectorAll(".agent-row"));
-  const target = rows.find(r => r.getAttribute("data-agent") === agentName);
-  if (!target) return;
-  const dot = target.querySelector(".agent-dot");
-  const statusEl = target.querySelector(".agent-row-status");
-  const running = status === "running";
-  const done = status === "completed";
-  const failed = status === "failed";
-  if (dot) {
-    dot.className = failed ? "agent-dot agent-failed" : done ? "agent-dot agent-done" : running ? "agent-dot agent-running" : "agent-dot agent-pending";
-  }
-  if (statusEl) {
-    statusEl.textContent = status === "completed" ? "Done" : status.charAt(0).toUpperCase() + status.slice(1);
-  }
-  target.classList.toggle("active", running);
-}
-
-// ==============================================================================
-// Analysis Trigger & Polling
-// ==============================================================================
-
-async function startAnalysis() {
-  const projectPath = inputProjectPath.value.trim();
-  if (!projectPath) {
-    alert("Please enter a valid repository directory path.");
+    setStatus(appEls.authLoading, `Could not verify your session: ${err.message}`);
     return;
   }
-
-  btnAnalyze.disabled = true;
-  btnAnalyze.innerHTML = '<span class="spinner" style="width:14px;height:14px;display:inline-block;margin:0 6px 0 0;"></span> Analyzing...';
-  pipelineProgress.classList.remove("hidden");
-  // Empty state lives in #page-body, which renderers wipe — re-query each run
-  const emptyEl = document.getElementById("empty-state");
-  const loadingEl = document.getElementById("loading-state");
-  if (emptyEl) emptyEl.classList.add("hidden");
-  if (loadingEl) loadingEl.classList.remove("hidden");
-
-  // Reset agent chips
-  Object.values(agentChipMap).forEach(chip => {
-    chip.className = "agent-chip";
-    chip.querySelector(".agent-status-icon").textContent = "⏳";
-  });
-  resetAgentRows();
-
-  try {
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project_path: projectPath }),
-    });
-
-    if (!res.ok) {
-      const errData = await res.json();
-      throw new Error(errData.error || "Failed to start analysis");
-    }
-
-    const data = await res.json();
-    currentAnalysisId = data.analysis_id;
-    analysisIdBadge.textContent = currentAnalysisId;
-    activeAgentLabel.textContent = "Indexing files...";
-
-    // Start polling status
-    if (pollInterval) clearInterval(pollInterval);
-    pollInterval = setInterval(pollProgress, 1000);
-
-  } catch (err) {
-    alert("Error: " + err.message);
-    btnAnalyze.disabled = false;
-    btnAnalyze.innerHTML = '<span class="btn-icon">⚡</span> Analyze Codebase';
-  }
+  appEls.authLoading.classList.add("hidden");
+  renderUser(session.user || {});
+  appEls.urlInput.value = currentRepoParam();
+  showView("start");
+  loadStartLists();
 }
 
-// ==============================================================================
-// Index Workspace (Model-Free - Works Without Ollama)
-// ==============================================================================
+function renderUser(user) {
+  appEls.userEmail.textContent = user.email || "";
+  const plan = user.plan || "free";
+  appEls.planBadge.textContent = `${plan.charAt(0).toUpperCase()}${plan.slice(1)} plan`;
+}
 
-async function startIndexing() {
-  const projectPath = inputProjectPath.value.trim();
-  if (!projectPath) {
-    alert("Please enter a valid repository directory path.");
+async function logout() {
+  appEls.logout.disabled = true;
+  try {
+    await API.logout();
+  } catch (err) {
+    // A 401 means the session is already gone, which is the state we want.
+    if (err.status !== 401) {
+      appEls.logout.disabled = false;
+      showGlobalError(`Log out failed: ${err.message}`);
+      return;
+    }
+  }
+  location.assign("/");
+}
+
+// ---------------------------------------------------------------------------
+// Start screen: analyze form, repositories, recent jobs
+// ---------------------------------------------------------------------------
+
+function friendlyApiError(err) {
+  if (!(err instanceof ApiError)) return "Network error. Check your connection and try again.";
+  if (err.status === 400) return err.message || "That does not look like a valid GitHub repository URL.";
+  if (err.status === 402) return err.message || "You have reached your plan's analysis limit.";
+  if (err.status === 429) return err.message || "Too many requests. Wait a moment and try again.";
+  return err.message;
+}
+
+function renderInlineError(container, err) {
+  const nodes = [friendlyApiError(err)];
+  if (err instanceof ApiError && err.status === 402) {
+    nodes.push(" ", el("a", { href: "/settings?upgrade=pro", text: "Upgrade your plan" }));
+  }
+  container.replaceChildren(...nodes);
+  container.hidden = false;
+}
+
+function setAnalyzeBusy(busy) {
+  appEls.analyzeBtn.disabled = busy;
+  appEls.analyzeBtn.textContent = busy ? "Starting..." : "Analyze";
+}
+
+async function onAnalyzeSubmit(event) {
+  event.preventDefault();
+  const url = appEls.urlInput.value.trim();
+  appEls.analyzeError.hidden = true;
+  if (!url) {
+    renderInlineError(appEls.analyzeError, new ApiError(400, "Enter a GitHub repository URL, for example https://github.com/owner/repo."));
     return;
   }
-
-  const repoName = projectPath.split("/").pop() || projectPath;
-  currentIndexRepo = repoName;
-
-  btnIndex.disabled = true;
-  btnIndex.innerHTML = '<span class="spinner" style="width:14px;height:14px;display:inline-block;margin:0 6px 0 0;"></span> Indexing...';
-  pipelineProgress.classList.remove("hidden");
-
-  // Reset agent chips for indexing view
-  Object.values(agentChipMap).forEach(chip => {
-    chip.className = "agent-chip";
-    chip.querySelector(".agent-status-icon").textContent = "⏳";
-  });
-  resetAgentRows();
-
+  setAnalyzeBusy(true);
   try {
-    const res = await fetch("/api/index", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project_path: projectPath, repo_name: repoName }),
-    });
-
-    if (!res.ok) {
-      const errData = await res.json();
-      throw new Error(errData.error || "Failed to start indexing");
-    }
-
-    const data = await res.json();
-    activeAgentLabel.textContent = "Indexing files...";
-
-    // Start polling repo status
-    if (indexPollInterval) clearInterval(indexPollInterval);
-    indexPollInterval = setInterval(pollIndexStatus, 1000);
-
+    const data = await API.analyzeGithub(url);
+    startProgress(data.job.id, url);
   } catch (err) {
-    alert("Error: " + err.message);
-    btnIndex.disabled = false;
-    btnIndex.innerHTML = '<span class="btn-icon">📥</span> Index Workspace';
+    renderInlineError(appEls.analyzeError, err);
+  } finally {
+    setAnalyzeBusy(false);
   }
 }
 
-async function pollIndexStatus() {
-  if (!currentIndexRepo) return;
+function repoNameFromUrl(url) {
+  return String(url || "").replace(/\.git$/, "").split("/").filter(Boolean).pop() || "Repository";
+}
 
-  try {
-    const res = await fetch("/api/index/repos");
-    if (!res.ok) return;
-    const data = await res.json();
+function analysisIdForRepo(repoId) {
+  const job = listState.jobs.find((j) => j.repo_id === repoId && j.analysis_id);
+  return job ? job.analysis_id : null;
+}
 
-    // Find the repo we just indexed
-    const repo = (data.repositories || []).find(
-      r => r.name === currentIndexRepo || r.path === inputProjectPath.value.trim()
+async function loadStartLists() {
+  const [reposRes, jobsRes] = await Promise.allSettled([API.repos(), API.jobs()]);
+  listState.jobs = jobsRes.status === "fulfilled" ? (jobsRes.value.jobs || []) : [];
+  renderJobList(jobsRes);
+  renderRepoList(reposRes);
+}
+
+function setListMessage(list, message) {
+  list.replaceChildren(el("li", { className: "form-error", text: message }));
+}
+
+function renderRepoList(result) {
+  if (result.status !== "fulfilled") {
+    setListMessage(appEls.repoList, `Could not load repositories: ${friendlyApiError(result.reason)}`);
+    return;
+  }
+  const repos = result.value.repositories || [];
+  appEls.reposEmpty.classList.toggle("hidden", repos.length > 0);
+  appEls.repoList.replaceChildren(...repos.map((repo) => {
+    const id = repo.id ?? repo.repo_id;
+    const name = repo.name ?? repo.repo_name ?? repoNameFromUrl(repo.github_url);
+    return el("li", {}, el(
+      "button",
+      {
+        className: "item-row",
+        type: "button",
+        on: { click: () => openRepo({ id, name, analysisId: analysisIdForRepo(id) }) },
+      },
+      el("span", { className: "item-title", text: name }),
+      el("span", { className: "item-sub", text: repo.github_url || "" }),
+    ));
+  }));
+}
+
+function renderJobList(result) {
+  if (result.status !== "fulfilled") {
+    setListMessage(appEls.jobList, `Could not load recent jobs: ${friendlyApiError(result.reason)}`);
+    return;
+  }
+  const jobs = listState.jobs;
+  appEls.jobsEmpty.classList.toggle("hidden", jobs.length > 0);
+  appEls.jobList.replaceChildren(...jobs.map((job) => el("li", {}, el(
+    "button",
+    {
+      className: "item-row",
+      type: "button",
+      on: { click: () => openJob(job) },
+    },
+    el("span", { className: "item-title", text: job.result?.repo_name || repoNameFromUrl(job.github_url) }),
+    el("span", { className: "item-sub", text: job.github_url || "" }),
+    el("span", { className: `status-chip status-${job.status}`, text: job.status }),
+  ))));
+}
+
+function openJob(job) {
+  if (job.status === "done" && job.repo_id) {
+    openRepo({
+      id: job.repo_id,
+      name: job.result?.repo_name || repoNameFromUrl(job.github_url),
+      analysisId: job.analysis_id || null,
+    });
+    return;
+  }
+  startProgress(job.id, job.github_url || "");
+}
+
+// ---------------------------------------------------------------------------
+// Job progress: poll GET /api/repos/jobs/{id} every 1.5s
+// ---------------------------------------------------------------------------
+
+function stopPolling() {
+  if (progressState.timer) clearTimeout(progressState.timer);
+  progressState.timer = null;
+  progressState.jobId = null;
+}
+
+function startProgress(jobId, githubUrl) {
+  stopPolling();
+  progressState.jobId = jobId;
+  progressState.githubUrl = githubUrl || "";
+  appEls.progressUrl.textContent = githubUrl || "";
+  appEls.progressError.hidden = true;
+  appEls.progressTrack.setAttribute("aria-valuenow", "0");
+  appEls.progressFill.style.width = "0%";
+  setStatus(appEls.progressStatus, "Queued...");
+  showView("progress");
+  pollJob(jobId);
+}
+
+function renderStepper(stage, status) {
+  const index = STAGES.indexOf(stage);
+  const finished = status === "done";
+  appEls.stepper.replaceChildren(...STAGES.map((name, i) => {
+    let state = "pending";
+    if (finished || i < index) state = "done";
+    else if (i === index) state = "active";
+    return el(
+      "li",
+      {
+        className: `stage stage-${state}`,
+        "aria-current": state === "active" ? "step" : false,
+        text: STAGE_LABELS[name],
+      },
     );
-    if (!repo) return;
-
-    activeAgentLabel.textContent = (repo.status || "unknown").replace("_", " ").toUpperCase();
-
-    if (repo.status === "complete") {
-      clearInterval(indexPollInterval);
-      activeAgentLabel.textContent = "Indexing Complete";
-      btnIndex.disabled = false;
-      btnIndex.innerHTML = '<span class="btn-icon">📥</span> Index Workspace';
-      alert("Workspace indexed successfully! You can now use chat and search features.");
-    } else if (repo.status === "failed" || repo.status === "error") {
-      clearInterval(indexPollInterval);
-      alert("Indexing failed: " + (repo.error || "Unknown error"));
-      btnIndex.disabled = false;
-      btnIndex.innerHTML = '<span class="btn-icon">📥</span> Index Workspace';
-    }
-  } catch (err) {
-    console.error("Index polling error:", err);
-  }
+  }));
 }
 
-async function pollProgress() {
-  if (!currentAnalysisId) return;
+function renderJobProgress(job) {
+  renderStepper(job.stage, job.status);
+  const pct = Math.max(0, Math.min(100, Number(job.progress) || 0));
+  appEls.progressFill.style.width = `${pct}%`;
+  appEls.progressTrack.setAttribute("aria-valuenow", String(pct));
+  const label = STAGE_LABELS[job.stage] || job.stage || "Queued";
+  setStatus(appEls.progressStatus, `${label} · ${pct}%`);
+}
 
+async function pollJob(jobId) {
+  if (progressState.jobId !== jobId) return;
   try {
-    const res = await fetch(`/api/analysis/${currentAnalysisId}`);
-    if (!res.ok) return;
-    const progress = await res.json();
-
-    activeAgentLabel.textContent = progress.status.replace("_", " ").toUpperCase();
-
-    // Update chips
-    const statuses = progress.agent_statuses || {};
-    for (const [agentName, status] of Object.entries(statuses)) {
-      const chip = agentChipMap[agentName];
-      if (!chip) continue;
-
-      chip.className = `agent-chip ${status}`;
-      const icon = chip.querySelector(".agent-status-icon");
-      if (status === "completed") icon.textContent = "✓";
-      else if (status === "running") icon.textContent = "⚡";
-      else if (status === "failed") icon.textContent = "✕";
-      else icon.textContent = "⏳";
-    }
-
-    // Update sidebar agent rows
-    const statusesNow = progress.agent_statuses || {};
-    agentList.querySelectorAll(".agent-row").forEach(row => {
-      const agentName = row.getAttribute("data-agent");
-      const status = statusesNow[agentName] || "pending";
-      const dot = row.querySelector(".agent-dot");
-      const statusEl = row.querySelector(".agent-row-status");
-      const running = status === "running";
-      const done = status === "completed";
-      const failed = status === "failed";
-      if (dot) {
-        dot.className = failed ? "agent-dot agent-failed" : done ? "agent-dot agent-done" : running ? "agent-dot agent-running" : "agent-dot agent-pending";
-      }
-      if (statusEl) {
-        statusEl.textContent = status === "completed" ? "Done" : status.charAt(0).toUpperCase() + status.slice(1);
-      }
-      row.classList.toggle("active", running);
-    });
-
-    // Slim pipeline progress bar (computed from agent completion state)
-    const agentNames = Object.keys(statusesNow);
-    const totalAgents = agentNames.length || 6;
-    const doneCount = Object.values(statusesNow).filter(s => s === "completed").length;
-    const runningCount = Object.values(statusesNow).filter(s => s === "running").length;
-    let pct = 0;
-    if (progress.status === "completed" || progress.has_report) {
-      pct = 100;
-    } else if (progress.status === "failed") {
-      pct = Math.round((doneCount / totalAgents) * 100);
-    } else if (runningCount > 0) {
-      pct = Math.round((doneCount / totalAgents) * 100);
+    const data = await API.job(jobId);
+    if (progressState.jobId !== jobId) return;
+    const job = data.job;
+    renderJobProgress(job);
+    if (job.status === "done") {
+      finishJob(job);
+    } else if (job.status === "failed") {
+      showJobFailed(job.error || "The analysis failed.");
     } else {
-      pct = 8; // initializing
-    }
-    if (pipelineProgressFill) pipelineProgressFill.style.width = pct + "%";
-
-    // Show skeleton cards while the pipeline is still running
-    if (progress.status !== "completed" && progress.status !== "failed") {
-      pageBody.innerHTML = `
-        <div class="card-grid">
-          <div class="card skeleton-card"></div>
-          <div class="card skeleton-card"></div>
-          <div class="card skeleton-card"></div>
-        </div>
-      `;
-    }
-
-    if (progress.status === "completed" || progress.has_report) {
-      clearInterval(pollInterval);
-      activeAgentLabel.textContent = "DONE";
-      btnAnalyze.disabled = false;
-      btnAnalyze.innerHTML = '<span class="btn-icon">⚡</span> Analyze Codebase';
-      loadFullReport(currentAnalysisId);
-    } else if (progress.status === "failed") {
-      clearInterval(pollInterval);
-      alert("Analysis failed: " + (progress.errors || []).join(", "));
-      btnAnalyze.disabled = false;
-      btnAnalyze.innerHTML = '<span class="btn-icon">⚡</span> Analyze Codebase';
+      progressState.timer = setTimeout(() => pollJob(jobId), POLL_INTERVAL_MS);
     }
   } catch (err) {
-    console.error("Polling error:", err);
+    if (progressState.jobId !== jobId) return;
+    if (err instanceof ApiError && err.status === 404) {
+      showJobFailed("This analysis job no longer exists.");
+      return;
+    }
+    setStatus(appEls.progressStatus, `Lost contact with the server. Retrying... (${friendlyApiError(err)})`);
+    progressState.timer = setTimeout(() => pollJob(jobId), POLL_INTERVAL_MS);
   }
 }
 
-// ==============================================================================
-// Report Loading & Rendering
-// ==============================================================================
+function finishJob(job) {
+  stopPolling();
+  if (!job.repo_id) {
+    showJobFailed("The analysis finished without a repository id.");
+    return;
+  }
+  openRepo({
+    id: job.repo_id,
+    name: job.result?.repo_name || repoNameFromUrl(job.github_url),
+    analysisId: job.analysis_id || null,
+  });
+}
 
-async function loadFullReport(analysisId) {
+function showJobFailed(message) {
+  stopPolling();
+  appEls.progressErrorText.textContent = message;
+  appEls.progressError.hidden = false;
+  setStatus(appEls.progressStatus, "Failed");
+}
+
+async function retryAnalysis() {
+  const url = progressState.githubUrl;
+  if (!url) {
+    backToStart();
+    return;
+  }
+  appEls.retryBtn.disabled = true;
   try {
-    const res = await fetch(`/api/analysis/${analysisId}/report`);
-    if (!res.ok) throw new Error("Could not load report");
-    currentReport = await res.json();
-
-    sidebarProjectName.textContent = currentReport.project_name;
-    reportContainer.classList.remove("hidden");
-    navigateToPage(1);
+    const data = await API.analyzeGithub(url);
+    startProgress(data.job.id, url);
   } catch (err) {
-    console.error("Load report error:", err);
+    appEls.progressErrorText.textContent = friendlyApiError(err);
+    appEls.progressError.hidden = false;
+  } finally {
+    appEls.retryBtn.disabled = false;
   }
 }
 
-function populateChips(content) {
-  const chipRow = document.getElementById("chip-row");
-  if (!chipRow) return;
-  chipRow.innerHTML = "";
-  const tags = [];
-  (content.languages || []).forEach(l => tags.push({ label: l, kind: "language" }));
-  (content.frameworks || []).forEach(f => tags.push({ label: f, kind: "framework" }));
-  tags.forEach(t => {
-    const chip = document.createElement("button");
-    chip.className = "chip";
-    chip.type = "button";
-    chip.innerHTML = `<span>${t.label}</span><span class="chip-count">0</span>`;
-    chip.addEventListener("click", () => {
-      chipRow.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
-      chip.classList.add("active");
-    });
-    chipRow.appendChild(chip);
+function backToStart() {
+  stopPolling();
+  closeRepo();
+  showView("start");
+  loadStartLists();
+}
+
+// ---------------------------------------------------------------------------
+// Repo workspace
+// ---------------------------------------------------------------------------
+
+function safeGithubLink(url) {
+  return /^https:\/\/github\.com\//.test(url || "") ? url : "";
+}
+
+async function openRepo({ id, name, analysisId }) {
+  stopPolling();
+  workspaceState.repoId = id;
+  workspaceState.repoName = name || "Repository";
+  workspaceState.analysisId = analysisId || null;
+
+  appEls.repoName.textContent = workspaceState.repoName;
+  const job = listState.jobs.find((j) => j.repo_id === id);
+  const url = safeGithubLink(job && job.github_url);
+  appEls.repoUrl.textContent = url || "";
+  appEls.repoUrl.href = url || "#";
+  appEls.repoUrl.hidden = !url;
+  appEls.repoScore.textContent = "Loading...";
+  appEls.severityRow.replaceChildren();
+  appEls.tabReport.classList.toggle("hidden", !analysisId);
+
+  closeNodePanel();
+  resetReport();
+  setChatRepo(id);
+  showView("workspace");
+  showWorkspaceTab("graph");
+
+  const [, summary] = await Promise.all([
+    loadGraph(id).catch(() => null), // loadGraph shows its own error in the graph status
+    loadFindings(id),
+  ]);
+  renderWorkspaceHeader(summary);
+}
+
+function closeRepo() {
+  workspaceState.repoId = null;
+  workspaceState.analysisId = null;
+  closeNodePanel();
+  resetReport();
+  setChatRepo(null);
+}
+
+function renderWorkspaceHeader(summary) {
+  if (!summary) {
+    appEls.repoScore.textContent = "Score unavailable";
+    return;
+  }
+  appEls.repoScore.textContent = summary.score != null ? `Score ${summary.score}/100` : "Score unavailable";
+  const bySeverity = summary.by_severity || {};
+  const counts = SEVERITY_ORDER.filter((sev) => bySeverity[sev]).map((sev) => el(
+    "li",
+    { className: "severity-count" },
+    severityBadge(sev),
+    el("span", { text: String(bySeverity[sev]) }),
+  ));
+  appEls.severityRow.replaceChildren(...(counts.length ? counts : [el("li", { className: "text-muted", text: "No findings" })]));
+}
+
+function showWorkspaceTab(name) {
+  appEls.wsTabs.forEach((tab) => {
+    const active = tab.dataset.view === name;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
   });
+  Object.entries(appEls.panels).forEach(([key, panel]) => panel.classList.toggle("hidden", key !== name));
+  if (name === "graph") resizeGraph();
+  if (name === "report") ensureReportLoaded();
 }
-
-function tabForPage(pageNum) {
-  for (const [tabId, page] of Object.entries(tabPageMap)) {
-    if (page === pageNum) return tabId;
-  }
-  return null;
-}
-
-function setActiveTab(tabId) {
-  currentTabId = tabId;
-  document.querySelectorAll(".tab-btn").forEach(btn => {
-    const isActive = btn.getAttribute("data-tab") === tabId;
-    btn.classList.toggle("active", isActive);
-    btn.setAttribute("aria-selected", isActive ? "true" : "false");
-  });
-  const pageNum = tabPageMap[tabId];
-  if (pageNum) navigateToPage(pageNum);
-}
-
-function navigateToPage(pageNum) {
-  if (!currentReport || pageNum < 1 || pageNum > 10) return;
-  currentPageNumber = pageNum;
-
-  // Update navigation buttons state
-  btnPrevPage.disabled = (currentPageNumber === 1);
-  btnNextPage.disabled = (currentPageNumber === 10);
-  pageIndicator.textContent = `Page ${currentPageNumber} of 10`;
-
-  // Sync folder tab state to the active page
-  const activeTabId = tabForPage(currentPageNumber);
-  document.querySelectorAll(".tab-btn").forEach(btn => {
-    const isActive = btn.getAttribute("data-tab") === activeTabId;
-    btn.classList.toggle("active", isActive);
-    btn.setAttribute("aria-selected", isActive ? "true" : "false");
-  });
-
-  const pageData = currentReport.pages.find(p => p.page_number === currentPageNumber);
-  if (!pageData) return;
-
-  pageTitle.textContent = pageData.title;
-  pageSubtitle.textContent = pageData.subtitle;
-
-  renderPageContent(currentPageNumber, pageData.content);
-}
-
-function renderPageContent(pageNum, content) {
-  pageBody.innerHTML = "";
-  populateChips(content);
-
-  switch (pageNum) {
-    case 1:
-      renderPage1(content);
-      break;
-    case 2:
-      renderPage2(content);
-      break;
-    case 3:
-      renderPage3(content);
-      break;
-    case 4:
-      renderPage4(content);
-      break;
-    case 5:
-      renderPage5(content);
-      break;
-    case 6:
-      renderPage6(content);
-      break;
-    case 7:
-      renderPage7(content);
-      break;
-    case 8:
-      renderPage8(content);
-      break;
-    case 9:
-      renderPage9(content);
-      break;
-    case 10:
-      renderPage10(content);
-      break;
-    default:
-      pageBody.innerHTML = `<p>${JSON.stringify(content, null, 2)}</p>`;
-  }
-
-  // Trigger Mermaid render if present
-  setTimeout(() => {
-    try {
-      mermaid.run({ querySelector: '.mermaid' });
-    } catch (e) {
-      console.warn("Mermaid render error:", e);
-    }
-  }, 100);
-}
-
-// ==============================================================================
-// Specific Page Renderers
-// ==============================================================================
-
-function renderPage1(c) {
-  pageBody.innerHTML = `
-    <div class="card">
-      <div class="card-title">📖 Core Identity & Purpose</div>
-      <p class="prose-lead">${c.summary || ""}</p>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
-        ${(c.languages || []).map(l => `<span class="badge badge-subtle">${l}</span>`).join("")}
-        ${(c.frameworks || []).map(f => `<span class="badge badge-subtle" style="color:var(--accent-sage-strong);border-color:var(--accent-sage);">${f}</span>`).join("")}
-      </div>
-    </div>
-
-    <div class="card-grid">
-      <div class="card">
-        <div class="card-title">🎯 Why This Project Exists</div>
-        <p>${c.why_it_exists || "Designed to solve concrete engineering domain requirements."}</p>
-      </div>
-      <div class="card">
-        <div class="card-title">💡 Problem It Solves</div>
-        <p>${c.problem_solved || "Provides automated, structured codebase comprehension."}</p>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">🚀 Important Entry Points</div>
-      <ul style="padding-left: 20px;">
-        ${(c.entry_points || []).map(ep => `<li style="margin-bottom:6px;"><span class="code-link" onclick="openFileViewer('${ep}')">${ep}</span></li>`).join("")}
-      </ul>
-    </div>
-  `;
-}
-
-function renderPage2(c) {
-  pageBody.innerHTML = `
-    <div class="card">
-      <div class="card-title">📂 Structural Directory Map</div>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 12px;">
-        ${(c.directories || []).map(d => `
-          <div style="background:var(--bg-tertiary); padding: 12px; border-radius: 6px; border:1px solid var(--border-color);">
-            <strong style="color:var(--accent-blue); font-family:var(--font-mono);">${d.path}</strong>
-            <p style="font-size:0.85rem; margin-top:4px;">${d.purpose}</p>
-            ${d.key_files && d.key_files.length ? `
-              <div style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap;">
-                ${d.key_files.map(kf => `<span class="code-link" style="font-size:0.75rem;" onclick="openFileViewer('${kf}')">${kf.split('/').pop()}</span>`).join("")}
-              </div>
-            ` : ""}
-          </div>
-        `).join("")}
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">🌲 Repository Hierarchy</div>
-      <pre class="code-block" style="max-height: 400px; overflow-y: auto;">${c.tree || "No tree representation"}</pre>
-    </div>
-  `;
-}
-
-function renderPage3(c) {
-  pageBody.innerHTML = `
-    <div class="card">
-      <div class="card-title">📐 High-Level Architecture Topology</div>
-      <div class="mermaid" style="background:var(--bg-tertiary); padding:16px; border-radius:6px; overflow-x:auto;">
-        ${c.architecture_diagram || "graph TD; App-->Module;"}
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">⚖️ Key Architectural Decisions & Rationale</div>
-      ${(c.decisions || []).map(d => `
-        <div style="margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color);">
-          <strong style="color:var(--text-primary); font-size:0.95rem;">${d.decision}</strong>
-          <p style="font-size:0.88rem; margin: 4px 0;"><span style="color:var(--accent-green);">Rationale:</span> ${d.rationale}</p>
-          <p style="font-size:0.84rem; color:var(--text-muted);"><span style="color:var(--accent-orange);">Trade-offs:</span> ${d.trade_offs}</p>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
-
-function renderPage4(c) {
-  pageBody.innerHTML = `
-    <div class="card">
-      <div class="card-title">🔌 Exposed Routes & Interface Endpoints</div>
-      <p style="margin-bottom: 16px; color:var(--text-secondary);">${c.summary || ""}</p>
-      <div style="display: flex; flex-direction: column; gap: 10px;">
-        ${(c.endpoints || []).map(ep => `
-          <div style="background:var(--bg-tertiary); padding: 12px 16px; border-radius: 6px; border-left: 3px solid var(--accent-blue); display:flex; justify-content:space-between; align-items:center;">
-            <code style="font-size:0.9rem; color:var(--accent-blue); font-family:var(--font-mono);">${ep}</code>
-            <span class="badge badge-subtle">Interface</span>
-          </div>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderPage5(c) {
-  pageBody.innerHTML = `
-    <div class="card">
-      <div class="card-title">⚡ End-to-End Execution Workflows</div>
-      <p style="margin-bottom: 20px; color:var(--text-secondary);">Visualizing step-by-step lifecycles from input trigger through service layers to response.</p>
-      
-      ${(c.flows || []).map(f => `
-        <div class="card" style="background:var(--bg-tertiary); margin-bottom: 24px;">
-          <h3 style="color:var(--accent-blue); margin-bottom: 6px;">${f.name}</h3>
-          <p style="font-size:0.88rem; color:var(--text-secondary); margin-bottom: 14px;"><strong>Trigger:</strong> <code>${f.trigger}</code></p>
-          <p style="font-size:0.88rem; margin-bottom: 16px;">${f.description}</p>
-
-          ${f.mermaid_diagram ? `
-            <div class="mermaid" style="background:var(--bg-secondary); padding:12px; border-radius:6px; margin-bottom:16px; overflow-x:auto;">
-              ${f.mermaid_diagram}
-            </div>
-          ` : ""}
-
-          <div class="flow-steps-container">
-            ${(f.steps || []).map((s, idx) => `
-              <div class="flow-step-item">
-                <div class="flow-step-badge">${s.step_number || (idx + 1)}</div>
-                <div class="flow-step-content">
-                  <div class="flow-step-layer">${s.layer}</div>
-                  <div style="font-weight:600; margin: 2px 0;">${s.component} &mdash; <code>${s.function_name}</code></div>
-                  <div style="font-size:0.82rem; margin: 4px 0;"><span class="code-link" onclick="openFileViewer('${s.file}')">${s.file}</span></div>
-                  <div style="font-size:0.85rem; color:var(--text-secondary);">${s.description}</div>
-                </div>
-              </div>
-              ${idx < (f.steps.length - 1) ? '<div class="flow-step-arrow">↓</div>' : ''}
-            `).join("")}
-          </div>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
-
-function renderPage6(c) {
-  pageBody.innerHTML = `
-    <div class="card">
-      <div class="card-title">🧩 Component Explorer</div>
-      <p class="prose-lead">Deep inspection of what core classes and modules ACTUALLY do (distinguishing naming from concrete behavior).</p>
-
-      ${c.mermaid_graph ? `
-        <div class="mermaid" style="background:var(--bg-tertiary); padding:16px; border-radius:6px; margin-bottom:20px; overflow-x:auto;">
-          ${c.mermaid_graph}
-        </div>
-      ` : ""}
-
-      <div class="card-grid">
-        ${(c.components || []).map(comp => `
-          <div class="card pastel-lavender">
-            <div class="card-head">
-              <strong class="strong">${comp.component}</strong>
-            </div>
-            <div class="card-file">
-              <span class="code-link" onclick="openFileViewer('${comp.file}')">${comp.file}</span>
-            </div>
-            <p class="card-text"><strong>Responsibility:</strong> ${comp.responsibility}</p>
-            <div class="card-text"><span class="text-muted">Inputs:</span> ${(comp.inputs || []).join(", ") || "None"}</div>
-            <div class="card-text"><span class="text-muted">Outputs:</span> ${(comp.outputs || []).join(", ") || "None"}</div>
-            <div class="card-text"><span class="text-muted">Side Effects:</span> ${(comp.side_effects || []).join(", ") || "None"}</div>
-            <div class="card-text"><span class="text-muted">Assumptions:</span> ${(comp.assumptions || []).join(", ") || "None"}</div>
-            <div class="card-text"><span class="text-muted">Failure Modes:</span> ${(comp.failure_modes || []).join(", ") || "None"}</div>
-          </div>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderPage7(c) {
-  pageBody.innerHTML = `
-    <div class="card">
-      <div class="card-title">💾 Data Movement & External Boundaries</div>
-      ${c.mermaid_diagram ? `
-        <div class="mermaid" style="background:var(--bg-tertiary); padding:16px; border-radius:6px; margin-bottom:20px; overflow-x:auto;">
-          ${c.mermaid_diagram}
-        </div>
-      ` : ""}
-
-      <h3 class="section-subtitle">Databases & Storage</h3>
-      <div class="card-grid">
-        ${(c.databases || []).map(db => `
-          <div class="card dir-card">
-            <strong class="strong">${db.name} (${db.type})</strong>
-            <p>${db.purpose}</p>
-            <div class="card-text">ORM/Driver: ${db.orm_or_driver}</div>
-            <div class="card-text">Models/Artifacts: ${(db.tables_or_models || []).join(", ")}</div>
-          </div>
-        `).join("")}
-      </div>
-
-      <h3 class="section-subtitle">External Services & AI/ML Integrations</h3>
-      <div class="card-grid">
-        ${(c.external_services || []).map(s => `
-          <div class="card dir-card">
-            <strong class="strong">${s.name}</strong>
-            <p>${s.purpose}</p>
-            <div class="card-text">Location: <code>${s.call_location}</code></div>
-            <div class="card-text"><strong style="color:var(--accent-orange);">Sent:</strong> ${s.sent_data}</div>
-            <div class="card-text"><strong style="color:var(--accent-green);">Received:</strong> ${s.received_data}</div>
-            <div class="card-text"><strong style="color:var(--accent-red);">Failure Risks:</strong> ${(s.failure_possibilities || []).join("; ")}</div>
-          </div>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderPage7(c) {
-  pageBody.innerHTML = `
-    <div class="card">
-      <div class="card-title">💾 Data Movement & External Boundaries</div>
-      ${c.mermaid_diagram ? `
-        <div class="mermaid" style="background:var(--bg-tertiary); padding:16px; border-radius:6px; margin-bottom:20px; overflow-x:auto;">
-          ${c.mermaid_diagram}
-        </div>
-      ` : ""}
-
-      <h3 style="margin: 20px 0 10px; font-size:1rem;">Databases & Storage</h3>
-      <div class="card-grid">
-        ${(c.databases || []).map(db => `
-          <div class="card" style="background:var(--bg-tertiary);">
-            <strong style="color:var(--accent-green);">${db.name} (${db.type})</strong>
-            <p style="font-size:0.85rem; margin-top:4px;">${db.purpose}</p>
-            <div style="font-size:0.8rem; margin-top:8px; color:var(--text-muted);">ORM/Driver: ${db.orm_or_driver}</div>
-            <div style="font-size:0.8rem; margin-top:4px;">Models/Artifacts: ${(db.tables_or_models || []).join(", ")}</div>
-          </div>
-        `).join("")}
-      </div>
-
-      <h3 style="margin: 20px 0 10px; font-size:1rem;">External Services & AI/ML Integrations</h3>
-      <div class="card-grid">
-        ${(c.external_services || []).map(s => `
-          <div class="card" style="background:var(--bg-tertiary);">
-            <strong style="color:var(--accent-purple);">${s.name}</strong>
-            <p style="font-size:0.85rem; margin: 4px 0;">${s.purpose}</p>
-            <div style="font-size:0.8rem; color:var(--text-muted);">Location: <code>${s.call_location}</code></div>
-            <div style="font-size:0.8rem; margin-top:4px;"><strong style="color:var(--accent-orange);">Sent:</strong> ${s.sent_data}</div>
-            <div style="font-size:0.8rem;"><strong style="color:var(--accent-green);">Received:</strong> ${s.received_data}</div>
-            <div style="font-size:0.8rem; margin-top:4px; color:var(--accent-red);">Failure Risks: ${(s.failure_possibilities || []).join("; ")}</div>
-          </div>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderPage8(c) {
-  const categoryClass = (cat) => {
-    const lower = (cat || "").toLowerCase();
-    if (lower.includes("confirmed")) return "gap-confirmed";
-    if (lower.includes("likely")) return "gap-likely";
-    if (lower.includes("architectural")) return "gap-architectural";
-    if (lower.includes("missing")) return "gap-missing";
-    return "gap-improvement";
-  };
-
-  const severityClass = (cat) => {
-    const lower = (cat || "").toLowerCase();
-    if (lower.includes("confirmed")) return "gap-critical";
-    if (lower.includes("likely")) return "gap-likely";
-    if (lower.includes("architectural")) return "gap-architectural";
-    if (lower.includes("missing")) return "gap-missing";
-    return "gap-improvement";
-  };
-
-  pageBody.innerHTML = `
-    <div class="card">
-      <div class="card-title">⚠️ Codebase Gaps, Technical Debt & Risks</div>
-      <p class="prose-lead">${c.summary || "Evaluated code health, missing validations, test coverage, and architectural bottlenecks."}</p>
-
-      <div class="gap-list">
-        ${(c.gaps || []).map(g => `
-          <div class="card pastel-blush gap-card ${severityClass(g.category)}">
-            <div class="gap-card-head">
-              <span class="gap-badge ${categoryClass(g.category)}">${g.category}</span>
-              <span class="text-muted">Confidence: <strong>${g.confidence}</strong></span>
-            </div>
-            <h3 class="gap-title">${g.gap}</h3>
-            <p class="card-text"><strong>Evidence:</strong> <code>${g.evidence}</code></p>
-            <p class="card-text"><strong class="text-warn">Why It Matters:</strong> ${g.why_it_matters}</p>
-            <p class="card-text"><strong class="text-danger">Possible Impact:</strong> ${g.possible_impact}</p>
-            <div class="card gap-action">
-              <strong class="text-ok">🛠️ Recommended Contribution:</strong> ${g.possible_contribution}
-            </div>
-          </div>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
-
-function renderPage9(c) {
-  pageBody.innerHTML = `
-    <div class="card">
-      <div class="card-title">📚 Conceptual Primitives to Learn</div>
-      <p style="margin-bottom: 20px; color:var(--text-secondary);">Engineering concepts required to deeply comprehend and extend this specific codebase.</p>
-
-      <div class="card-grid">
-        ${(c.concepts || []).map(con => `
-          <div class="card" style="background:var(--bg-tertiary);">
-            <h3 style="color:var(--accent-blue); font-size:1.05rem; margin-bottom:6px;">${con.concept}</h3>
-            <p style="font-size:0.88rem; margin-bottom:10px;">${con.definition}</p>
-            <p style="font-size:0.84rem; color:var(--text-secondary); margin-bottom:6px;"><strong style="color:var(--accent-green);">Why Relevant Here:</strong> ${con.why_relevant_here}</p>
-            <p style="font-size:0.8rem; color:var(--text-muted);"><strong style="color:var(--accent-purple);">Used In:</strong> <code>${con.where_used_in_project}</code></p>
-          </div>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderPage10(c) {
-  const qa = c.answers_to_25_questions || {};
-  const qaEntries = Object.entries(qa);
-
-  pageBody.innerHTML = `
-    <div class="card">
-      <div class="card-title">🎓 Synthesized Mental Model</div>
-      <p class="prose-lead">${c.simple_explanation || ""}</p>
-      <div class="card">
-        <strong>💼 Interview Walkthrough:</strong>
-        <p>${c.interview_explanation || ""}</p>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">📖 Recommended Reading Order for Developers</div>
-      <div class="reading-list">
-        ${(c.first_files_to_read || []).map(f => `
-          <div class="card dir-card">
-            <span class="flow-step-badge">${f.order}</span>
-            <div>
-              <div><span class="code-link" onclick="openFileViewer('${f.file}')">${f.file}</span></div>
-              <p>${f.why_read_first}</p>
-              ${f.key_symbols_to_watch && f.key_symbols_to_watch.length ? `
-                <div class="text-blue"><strong>Key symbols:</strong> ${f.key_symbols_to_watch.map(s => `<code>${s}</code>`).join(", ")}</div>
-              ` : ""}
-            </div>
-          </div>
-        `).join("")}
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">❓ The 25 Core Developer Mental Model Questions</div>
-      <div class="qa-list">
-        ${qaEntries.map(([question, answer], idx) => `
-          <div class="card pastel-lavender qa-card">
-            <span class="qa-num">${idx + 1}</span>
-            <strong>${question}</strong>
-            <p>${answer}</p>
-          </div>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
-// ==============================================================================
-// Interactive Code Inspection Modal
-// ==============================================================================
-
-async function openFileViewer(filepath) {
-  if (!currentAnalysisId) return;
-
-  modalFilepath.textContent = `Loading ${filepath}...`;
-  modalCodeContent.textContent = "Fetching source content...";
-  codeModal.classList.remove("hidden");
-
-  try {
-    const res = await fetch(`/api/analysis/${currentAnalysisId}/file?path=${encodeURIComponent(filepath)}`);
-    if (!res.ok) throw new Error("Could not retrieve file content");
-    const data = await res.json();
-
-    modalFilepath.textContent = data.path + (data.truncated ? " (Truncated)" : "");
-    modalCodeContent.textContent = data.content;
-  } catch (err) {
-    modalCodeContent.textContent = `Error reading file: ${err.message}`;
-  }
-}
-// ==============================================================================
-// Sherlock Chat Widget
-// ==============================================================================
-
-let chatWidget = null;
-let chatPanel = null;
-let chatBubble = null;
-let chatInput = null;
-let chatMessages = null;
-let chatStatus = null;
-let currentChatSessionId = null;
-let currentRepoId = null;
-let isStreaming = false;
-let isOpen = false;
-
-function initChatWidget() {
-  chatWidget = document.getElementById('chat-widget');
-  chatPanel = document.getElementById('chat-panel');
-  chatBubble = document.getElementById('chat-bubble');
-  chatInput = document.getElementById('chat-input');
-  chatMessages = document.getElementById('chat-messages');
-  chatStatus = document.getElementById('chat-status');
-
-  const btnClose = document.getElementById('chat-close');
-  const btnNewChat = document.getElementById('chat-new-chat');
-  const btnSend = document.getElementById('chat-send');
-
-  chatBubble.addEventListener('click', toggleChat);
-  btnClose.addEventListener('click', () => { isOpen = false; chatPanel.classList.add('hidden'); });
-  btnNewChat.addEventListener('click', startNewChat);
-
-  chatInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-
-  btnSend.addEventListener('click', sendMessage);
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isOpen) {
-      chatPanel.classList.add('hidden');
-      isOpen = false;
-    }
-  });
-}
-
-function toggleChat() {
-  isOpen = !isOpen;
-  if (isOpen) {
-    chatPanel.classList.remove('hidden');
-    chatInput.focus();
-  } else {
-    chatPanel.classList.add('hidden');
-  }
-}
-
-function startNewChat() {
-  currentChatSessionId = null;
-  chatMessages.innerHTML = '';
-  chatInput.value = '';
-  chatStatus.textContent = '';
-  addSystemMessage('New chat started. Ask a question about your codebase.');
-  fetchCreateSession();
-}
-
-async function fetchCreateSession() {
-  try {
-    const response = await fetch('/api/chat/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ repo_id: currentRepoId })
-    });
-    if (response.ok) {
-      const data = await response.json();
-      currentChatSessionId = data.session_id;
-      document.getElementById('chat-session-title').textContent = data.title || 'New Chat';
-    }
-  } catch (err) {
-    console.error('Create session failed:', err);
-    chatStatus.textContent = 'Error creating session';
-  }
-}
-
-async function sendMessage() {
-  const text = chatInput.value.trim();
-  if (!text || isStreaming) return;
-
-  chatInput.value = '';
-  chatInput.disabled = true;
-
-  addMessage('user', text);
-
-  if (!currentChatSessionId) {
-    await fetchCreateSession();
-  }
-
-  chatStatus.textContent = 'Sherlock is thinking...';
-  isStreaming = true;
-
-  const streamingMsg = addMessage('assistant', '', true);
-
-  try {
-    const response = await fetch('/api/chat/sessions/' + currentChatSessionId + '/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: text, retrieval_method: 'hybrid', limit: 10 })
-    });
-
-    if (!response.ok) {
-      throw new Error('Request failed: ' + response.status);
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let fullAnswer = '';
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const event = JSON.parse(line.slice(6));
-            if (event.type === 'token') {
-              fullAnswer += event.text;
-              updateStreamingMessage(streamingMsg, fullAnswer);
-            } else if (event.type === 'done') {
-              fullAnswer = event.answer;
-              updateStreamingMessage(streamingMsg, fullAnswer);
-              if (event.citations && event.citations.length > 0) {
-                addCitations(streamingMsg, event.citations);
-              }
-              isStreaming = false;
-              chatInput.disabled = false;
-              chatStatus.textContent = '';
-            }
-          } catch (e) {
-            console.error('SSE parse error:', e);
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Stream error:', err);
-    chatStatus.textContent = 'Error: ' + err.message;
-    isStreaming = false;
-    chatInput.disabled = false;
-  }
-}
-
-function addMessage(role, text, streaming = false) {
-  const div = document.createElement('div');
-  div.className = 'chat-message ' + role;
-
-  const bubble = document.createElement('div');
-  bubble.className = 'chat-message-bubble';
-
-  if (streaming) {
-    div.classList.add('streaming');
-    bubble.textContent = text;
-    div.appendChild(bubble);
-    chatMessages.appendChild(div);
-    scrollToBottom();
-    return div;
-  }
-
-  div.appendChild(bubble);
-  chatMessages.appendChild(div);
-  scrollToBottom();
-
-  let i = 0;
-  function type() {
-    if (i < text.length) {
-      bubble.textContent += text.charAt(i);
-      i++;
-      scrollToBottom();
-      setTimeout(type, 10);
-    }
-  }
-  type();
-
-  return div;
-}
-
-function updateStreamingMessage(div, text) {
-  const bubble = div.querySelector('.chat-message-bubble') || div;
-  bubble.textContent = text;
-  scrollToBottom();
-}
-
-function addCitations(messageDiv, citations) {
-  const citationsContainer = document.createElement('div');
-  citationsContainer.className = 'citations';
-  citationsContainer.style.marginTop = '10px';
-  citationsContainer.style.fontSize = '0.8rem';
-
-  citations.forEach((c, idx) => {
-    const chip = document.createElement('div');
-    chip.className = 'citation-chip';
-    chip.textContent = c.source_id + ' ' + c.file_path + ':' + c.start_line;
-    chip.onclick = () => {
-      if (typeof openFileViewer === 'function') {
-        openFileViewer(c.file_path);
-      }
-    };
-    citationsContainer.appendChild(chip);
-  });
-
-  const messageDivEl = document.querySelector('.chat-message:last-child');
-  if (messageDivEl) {
-    messageDivEl.appendChild(citationsContainer);
-  }
-}
-
-function scrollToBottom() {
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-window.sherlockChat = {
-  setRepoId: (id) => { currentRepoId = id; },
-  open: () => { if (!isOpen) toggleChat(); }
-};

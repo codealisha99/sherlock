@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Sherlock turns any GitHub repository into an AST graph with embeddings, a security and code-quality scan, and a chat that can answer questions about any node.">
+  <meta name="color-scheme" content="light">
+  <title>Sherlock — Understand any codebase, node by node</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/" aria-label="Sherlock home">
+        <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#5f7a54" stroke-width="2.2"/>
+          <line x1="18" y1="18" x2="25" y2="25" stroke="#5f7a54" stroke-width="2.6" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="2.6" fill="#7c9a6d"/>
+        </svg>
+        Sherlock
+      </a>
+
+      <nav class="nav-links" aria-label="Primary">
+        <a class="nav-section" href="#features">Features</a>
+        <a class="nav-section" href="#how-it-works">How it works</a>
+        <a class="nav-section" href="#security">Security</a>
+        <a class="nav-section" href="#pricing">Pricing</a>
+      </nav>
+
+      <div class="nav-auth">
+        <a class="btn btn-ghost btn-sm" href="/login" data-auth="guest">Log in</a>
+        <a class="btn btn-primary btn-sm" href="/signup" data-auth="guest">Get started</a>
+        <a class="btn btn-ghost btn-sm" href="/app" data-auth="user" hidden>Open app</a>
+        <a class="btn btn-ghost btn-sm" href="/settings" data-auth="user" hidden>Settings</a>
+        <button type="button" class="btn btn-secondary btn-sm" data-action="logout" data-auth="user" hidden>Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Hero -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="container hero-grid">
+        <div>
+          <p class="eyebrow">Codebase intelligence</p>
+          <h1 id="hero-title">Read a codebase like a <em>detective</em> reads a case file.</h1>
+          <p class="lead">Paste a GitHub repository. Sherlock builds an AST graph and vector embeddings, scans for vulnerabilities and code-quality hotspots, and lets you ask questions about any file, function or class.</p>
+
+          <form class="repo-form" id="repo-form" novalidate>
+            <div class="repo-form-row">
+              <label class="sr-only" for="repo-url">GitHub repository URL</label>
+              <input class="input" id="repo-url" name="repo" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+                     placeholder="https://github.com/owner/repo" aria-describedby="repo-help repo-error" required>
+              <button class="btn btn-primary" type="submit">Analyze repository</button>
+            </div>
+            <p class="help" id="repo-help">Repositories on github.com. Sherlock makes a shallow clone and reads the code.</p>
+            <p class="form-error" id="repo-error" role="alert"></p>
+          </form>
+          <p class="hero-note">The Free plan includes monthly analyses and daily chat. See pricing below.</p>
+        </div>
+
+        <figure class="graph-card">
+          <svg viewBox="0 0 480 340" role="img" aria-labelledby="graph-title graph-desc">
+            <title id="graph-title">Illustrative dependency graph</title>
+            <desc id="graph-desc">A small graph of files and functions. Most nodes are healthy. One function is flagged as vulnerable and two are flagged as warnings.</desc>
+            <!-- edges -->
+            <line class="g-edge" x1="90" y1="80" x2="230" y2="60"/>
+            <line class="g-edge g-edge-flag" x1="230" y1="60" x2="360" y2="120"/>
+            <line class="g-edge" x1="90" y1="80" x2="160" y2="190"/>
+            <line class="g-edge" x1="160" y1="190" x2="320" y2="230"/>
+            <line class="g-edge" x1="320" y1="230" x2="410" y2="268"/>
+            <line class="g-edge" x1="160" y1="190" x2="90" y2="284"/>
+            <line class="g-edge" x1="160" y1="190" x2="250" y2="300"/>
+            <line class="g-edge" x1="250" y1="300" x2="320" y2="230"/>
+            <line class="g-edge g-edge-flag" x1="360" y1="120" x2="320" y2="230"/>
+            <!-- nodes -->
+            <circle class="g-node g-node-good" cx="90" cy="80" r="20"/>
+            <circle class="g-node g-node-warn" cx="230" cy="60" r="18"/>
+            <circle class="g-node g-node-bad" cx="360" cy="120" r="19"/>
+            <circle class="g-node g-node-good" cx="160" cy="190" r="22"/>
+            <circle class="g-node g-node-good" cx="320" cy="230" r="18"/>
+            <circle class="g-node g-node-good" cx="410" cy="268" r="16"/>
+            <circle class="g-node g-node-warn" cx="90" cy="284" r="17"/>
+            <circle class="g-node g-node-good" cx="250" cy="300" r="16"/>
+            <!-- labels -->
+            <text class="g-label" x="90" y="118" text-anchor="middle">routes.py</text>
+            <text class="g-label" x="230" y="34" text-anchor="middle">auth.py</text>
+            <text class="g-label" x="360" y="158" text-anchor="middle">login()</text>
+            <text class="g-label" x="160" y="228" text-anchor="middle">storage.py</text>
+            <text class="g-label" x="320" y="268" text-anchor="middle">chat.py</text>
+            <text class="g-label" x="410" y="300" text-anchor="middle">graph.py</text>
+            <text class="g-label" x="90" y="320" text-anchor="middle">embed()</text>
+            <text class="g-label" x="250" y="334" text-anchor="middle">scanner.py</text>
+          </svg>
+          <figcaption>
+            <span class="legend">
+              <span class="legend-item"><span class="dot dot-good" aria-hidden="true"></span>Healthy</span>
+              <span class="legend-item"><span class="dot dot-warn" aria-hidden="true"></span>Lagging</span>
+              <span class="legend-item"><span class="dot dot-bad" aria-hidden="true"></span>Vulnerable</span>
+            </span>
+            <span>Illustrative example</span>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="section band" id="how-it-works" aria-labelledby="how-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">How it works</p>
+          <h2 id="how-title">From URL to answers in four steps.</h2>
+          <p>Each step runs on the server against a shallow clone. You watch progress in the workspace and can stop reading at any point.</p>
+        </div>
+        <ol class="steps">
+          <li class="step">
+            <span class="step-num" aria-hidden="true">1</span>
+            <h3>Paste a URL</h3>
+            <p>Give Sherlock a github.com repository. It makes a shallow clone with size limits.</p>
+          </li>
+          <li class="step">
+            <span class="step-num" aria-hidden="true">2</span>
+            <h3>Build the graph</h3>
+            <p>Files, classes, functions and imports become an AST graph. Code chunks get vector embeddings for search.</p>
+          </li>
+          <li class="step">
+            <span class="step-num" aria-hidden="true">3</span>
+            <h3>Scan the code</h3>
+            <p>Security rules, secret detection, dependency hygiene and quality metrics such as complexity and test gaps.</p>
+          </li>
+          <li class="step">
+            <span class="step-num" aria-hidden="true">4</span>
+            <h3>Explore and ask</h3>
+            <p>Click any node to see its findings and source. Chat with the repository, scoped to that node, with citations.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section" id="features" aria-labelledby="features-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Features</p>
+          <h2 id="features-title">Everything you need to get oriented in a new repo.</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="card">
+            <span class="tag tag-sage">Graph</span>
+            <h3>Interactive AST graph</h3>
+            <p>Navigate files, classes, functions and their calls and imports. Filter by health, follow edges, and jump to the source line.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag-blush">Security</span>
+            <h3>Vulnerability scanner with CWE mapping</h3>
+            <p>Findings carry a severity, a snippet, a recommendation and a CWE identifier where one applies, so you can triage with a shared vocabulary.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag-butter">Quality</span>
+            <h3>Lagging-code hotspots</h3>
+            <p>See where complexity, file size and missing tests concentrate. Hotspots show up on the graph, not buried in a report.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag-lavender">Chat</span>
+            <h3>Chat on any node</h3>
+            <p>Ask why a function exists or how a flow works. Answers cite the files they came from, and the chat is scoped to the node you are viewing.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag-sky">Keys</span>
+            <h3>Bring your own API key</h3>
+            <p>Use OpenAI, Anthropic, Groq, OpenRouter or any OpenAI-compatible endpoint. Your key is used for your requests only.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag-sage">Privacy</span>
+            <h3>Private to your account</h3>
+            <p>Repositories, findings and chats belong to the account that created them. Other users cannot list or open them.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Security -->
+    <section class="section band" id="security" aria-labelledby="security-title">
+      <div class="container security-layout">
+        <div>
+          <p class="eyebrow">Security</p>
+          <h2 id="security-title">Built to handle code you did not write.</h2>
+          <p class="lead">Repositories are untrusted input. Sherlock treats them that way at every step, from the clone to the answer a model gives you.</p>
+        </div>
+        <ul class="check-list">
+          <li><strong>Encrypted API keys.</strong> Bring-your-own keys are encrypted at rest with a server-side master key. They are decrypted only in memory when a request needs them, and are never shown again after you save them.</li>
+          <li><strong>Hashed passwords.</strong> Passwords are stored with scrypt and a per-user salt. Session tokens are random and only their hash is stored.</li>
+          <li><strong>Rate limiting.</strong> Sign-in, analysis, chat and webhook endpoints each have their own per-IP or per-account limits. Repeated failed logins lock the account for a short period.</li>
+          <li><strong>Prompt-injection defense.</strong> Questions are screened before they reach a model. Repository content is fenced as data, not instructions, before it is sent as context.</li>
+          <li><strong>Safe cloning.</strong> Only https://github.com URLs with a strict owner and repo format are accepted. Clones are shallow, run without git hooks, and are capped in size. Symlinks are not followed.</li>
+          <li><strong>Isolated repositories.</strong> Every repository, job, finding and chat session is scoped to the account that owns it.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Pricing -->
+    <section class="section" id="pricing" aria-labelledby="pricing-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Pricing</p>
+          <h2 id="pricing-title">Start free. Upgrade when you analyze more.</h2>
+          <p>Limits apply per account. Free covers evaluation; Pro raises the monthly analysis and daily chat allowances.</p>
+        </div>
+        <p class="form-status" id="pricing-status" role="status"></p>
+        <div class="pricing-grid" id="pricing-grid" aria-live="polite">
+          <p class="muted">Loading plans…</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section band" id="faq" aria-labelledby="faq-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">FAQ</p>
+          <h2 id="faq-title">Questions people ask first.</h2>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>Which repositories can I analyze?</summary>
+            <p>Repositories hosted on github.com. Enter the full URL, for example https://github.com/owner/repo. Repositories that the server cannot clone are reported as failed analyses with the reason shown.</p>
+          </details>
+          <details>
+            <summary>Which languages are supported?</summary>
+            <p>Python gets full AST analysis. JavaScript and TypeScript get import extraction and pattern-based rules. Other languages are covered by text-based rules and show up in the file-level graph and search.</p>
+          </details>
+          <details>
+            <summary>Do I need my own API key?</summary>
+            <p>No. Without a key, chat uses the platform model. If you add a key, your requests use it instead and count against your provider account, not our quota.</p>
+          </details>
+          <details>
+            <summary>When is my code sent to a model?</summary>
+            <p>Repository analysis runs on Sherlock's servers. Code is sent to a model provider only when you ask a chat question, and then only the context retrieved for that question is included, fenced as untrusted data.</p>
+          </details>
+          <details>
+            <summary>What counts toward my limits?</summary>
+            <p>Each repository analysis counts once toward the monthly analysis limit. Each question you send in chat counts toward the daily chat limit. Limits and usage are shown in Settings.</p>
+          </details>
+          <details>
+            <summary>How do I upgrade or cancel?</summary>
+            <p>Upgrade from Settings. Payments are handled by Stripe Checkout, and your plan updates once payment is confirmed. Plan changes and billing history are in Settings under Billing.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <a class="brand" href="/">Sherlock</a>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#security">Security</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+        <a href="/login" data-auth="guest">Log in</a>
+        <a href="/signup" data-auth="guest">Sign up</a>
+        <a href="/settings" data-auth="user" hidden>Settings</a>
+      </nav>
+      <p class="footer-note">Sherlock analyzes code you point it at. Scan results are guidance for review, not a guarantee that code is free of defects.</p>
+    </div>
+  </footer>
+
+  <script src="/site.js" defer></script>
+  <script src="/landing.js" defer></script>
+</body>
+</html>

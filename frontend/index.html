@@ -4,263 +4,243 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
-  <title>Sherlock — Codebase Intelligence & Architecture Explorer</title>
+  <title>Sherlock Workspace</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
-  <!-- Mermaid.js for interactive diagrams -->
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-  <script>
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'default',
-      securityLevel: 'loose',
-      themeVariables: {
-        background: '#fffdf8',
-        primaryColor: '#7c9a6d',
-        primaryBorderColor: '#5f7a54',
-        lineColor: '#8a8175'
-      }
-    });
-  </script>
 </head>
-<body>
-  <!-- Single rounded panel shell -->
+<body class="workspace-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+
   <div class="app-shell">
-    <!-- Top Bar -->
     <header class="app-header">
       <div class="topbar-left">
-        <div class="logo">
-          <span class="magnifier">🔍</span>
+        <a class="logo" href="/" aria-label="Sherlock home">
+          <span class="magnifier" aria-hidden="true">🔍</span>
           <span class="logo-title">SHERLOCK</span>
-          <span class="badge badge-subtle">V1.0 Architecture Explorer</span>
-        </div>
+        </a>
       </div>
       <div class="topbar-right">
-        <div id="ollama-status-badge" class="status-pill status-checking">
-          <span class="dot"></span>
-          <span id="ollama-status-text">Checking Ollama...</span>
-        </div>
+        <span id="plan-badge" class="badge badge-subtle">Free plan</span>
+        <span id="user-email" class="user-email"></span>
+        <a class="btn btn-secondary btn-sm" href="/settings">Settings</a>
+        <button id="btn-logout" class="btn btn-secondary btn-sm" type="button">Log out</button>
       </div>
     </header>
 
-    <!-- Main Container -->
-    <div class="main-layout">
-    <!-- Analysis Starter Bar -->
-    <section class="analysis-bar-container">
-      <div class="analysis-bar">
-        <div class="input-group">
-          <label for="project-path-input">Repository Path:</label>
-          <input 
-            type="text" 
-            id="project-path-input" 
-            placeholder="/absolute/path/to/project (e.g. /Users/alisha/Desktop/Sherlock)" 
-            value="/Users/alisha/Desktop/Sherlock"
-          />
-        </div>
-        <button id="btn-analyze" class="btn btn-primary">
-          <span class="btn-icon">⚡</span> Analyze Codebase
-        </button>
-        <button id="btn-index" class="btn btn-secondary">
-          <span class="btn-icon">📥</span> Index Workspace
-        </button>
-      </div>
+    <main id="main" class="app-main" tabindex="-1">
+      <p id="global-error" class="form-error hidden" role="alert"></p>
+      <p id="auth-loading" class="auth-loading" role="status">Checking your session...</p>
 
-      <!-- Agent Pipeline Progress Widget -->
-      <div id="pipeline-progress" class="pipeline-card hidden">
-        <div class="pipeline-header">
-          <div class="pipeline-title">
-            <span>Multi-Agent Pipeline Execution</span>
-            <span id="active-agent-label" class="current-tag">Initializing</span>
-          </div>
-          <span id="analysis-id-badge" class="text-muted"></span>
-        </div>
-        
-        <div class="pipeline-progress-track">
-          <div id="pipeline-progress-fill" class="pipeline-progress-fill" style="width: 0%"></div>
-        </div>
-        
-        <div class="agents-grid">
-          <div class="agent-chip" id="chip-mapper">
-            <span class="agent-status-icon">⏳</span>
-            <div class="agent-info">
-              <strong>1. Repository Mapper</strong>
-              <small>Structure & Tech Stack</small>
-            </div>
-          </div>
-          <div class="agent-chip" id="chip-flows">
-            <span class="agent-status-icon">⏳</span>
-            <div class="agent-info">
-              <strong>2. Flow Tracer</strong>
-              <small>Routes & Workflows</small>
-            </div>
-          </div>
-          <div class="agent-chip" id="chip-components">
-            <span class="agent-status-icon">⏳</span>
-            <div class="agent-info">
-              <strong>3. Component Analyst</strong>
-              <small>Inputs, Outputs & Side-effects</small>
-            </div>
-          </div>
-          <div class="agent-chip" id="chip-data">
-            <span class="agent-status-icon">⏳</span>
-            <div class="agent-info">
-              <strong>4. Data Analyst</strong>
-              <small>DBs, APIs & ML Integration</small>
-            </div>
-          </div>
-          <div class="agent-chip" id="chip-gaps">
-            <span class="agent-status-icon">⏳</span>
-            <div class="agent-info">
-              <strong>5. Gap Analyst</strong>
-              <small>Issues & Opportunities</small>
-            </div>
-          </div>
-          <div class="agent-chip" id="chip-teacher">
-            <span class="agent-status-icon">⏳</span>
-            <div class="agent-info">
-              <strong>6. Teacher Agent</strong>
-              <small>25-Question Mental Model</small>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+      <!-- Start screen -->
+      <section id="view-start" class="view hidden" aria-labelledby="start-title">
+        <h1 id="start-title">Analyze a GitHub repository</h1>
+        <p class="lead">Paste a public GitHub URL. Sherlock clones it, maps the code graph, and scans for security and quality issues.</p>
 
-    <!-- Report Layout: Sidebar & Content View -->
-    <div id="report-container" class="report-layout hidden">
-      <!-- 10-Page Sidebar Navigation -->
-      <nav class="report-sidebar">
-        <div class="sidebar-header">
-          <div class="sidebar-header-row">
-            <span class="sidebar-title">Analysis</span>
-            <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Toggle agent list">&#9771;</button>
+        <form id="analyze-form" class="analyze-form" novalidate>
+          <label for="repo-url-input">GitHub repository URL</label>
+          <div class="input-row">
+            <input id="repo-url-input" type="url" inputmode="url" autocomplete="off"
+                   placeholder="https://github.com/owner/repo" required>
+            <button id="btn-analyze" class="btn btn-primary" type="submit">Analyze</button>
           </div>
-          <span id="sidebar-project-name" class="sidebar-project"></span>
-        </div>
-        <div class="agent-list" id="agent-list">
-          <div class="agent-row" data-agent="Repository Mapper">
-            <span class="agent-dot agent-pending"></span>
-            <div class="agent-row-info">
-              <span class="agent-row-name">Repository Mapper</span>
-              <span class="agent-row-sub">Structure &amp; Tech Stack</span>
-            </div>
-            <span class="agent-row-status">Pending</span>
-          </div>
-          <div class="agent-row" data-agent="Flow Tracer">
-            <span class="agent-dot agent-pending"></span>
-            <div class="agent-row-info">
-              <span class="agent-row-name">Flow Tracer</span>
-              <span class="agent-row-sub">Routes &amp; Workflows</span>
-            </div>
-            <span class="agent-row-status">Pending</span>
-          </div>
-          <div class="agent-row" data-agent="Component Analyst">
-            <span class="agent-dot agent-pending"></span>
-            <div class="agent-row-info">
-              <span class="agent-row-name">Component Analyst</span>
-              <span class="agent-row-sub">Inputs, Outputs &amp; Side-effects</span>
-            </div>
-            <span class="agent-row-status">Pending</span>
-          </div>
-          <div class="agent-row" data-agent="Data Analyst">
-            <span class="agent-dot agent-pending"></span>
-            <div class="agent-row-info">
-              <span class="agent-row-name">Data Analyst</span>
-              <span class="agent-row-sub">DBs, APIs &amp; ML Integration</span>
-            </div>
-            <span class="agent-row-status">Pending</span>
-          </div>
-          <div class="agent-row" data-agent="Gap Analyst">
-            <span class="agent-dot agent-pending"></span>
-            <div class="agent-row-info">
-              <span class="agent-row-name">Gap Analyst</span>
-              <span class="agent-row-sub">Issues &amp; Opportunities</span>
-            </div>
-            <span class="agent-row-status">Pending</span>
-          </div>
-          <div class="agent-row" data-agent="Teacher">
-            <span class="agent-dot agent-pending"></span>
-            <div class="agent-row-info">
-              <span class="agent-row-name">Teacher</span>
-              <span class="agent-row-sub">25-Question Mental Model</span>
-            </div>
-            <span class="agent-row-status">Pending</span>
-          </div>
-        </div>
-        <div class="sidebar-footer">
-          <button id="btn-new-analysis" class="sidebar-action" type="button">+ New analysis</button>
-        </div>
-      </nav>
+          <p id="analyze-error" class="form-error" role="alert" hidden></p>
+        </form>
 
-      <!-- Page Content Viewer -->
-      <main class="report-viewer">
-        <div class="page-header-bar">
-          <div>
-            <h1 id="page-title">Project Overview</h1>
-            <p id="page-subtitle" class="text-muted">Loading codebase understanding...</p>
+        <div class="start-grid">
+          <section aria-labelledby="repos-title">
+            <h2 id="repos-title">Your repositories</h2>
+            <ul id="repo-list" class="item-list"></ul>
+            <p id="repos-empty" class="text-muted hidden">No analyzed repositories yet.</p>
+          </section>
+          <section aria-labelledby="jobs-title">
+            <h2 id="jobs-title">Recent jobs</h2>
+            <ul id="job-list" class="item-list"></ul>
+            <p id="jobs-empty" class="text-muted hidden">No jobs yet.</p>
+          </section>
+        </div>
+      </section>
+
+      <!-- Progress -->
+      <section id="view-progress" class="view hidden" aria-labelledby="progress-title">
+        <h1 id="progress-title">Analyzing repository</h1>
+        <p id="progress-url" class="text-muted break"></p>
+
+        <ol id="stage-stepper" class="stepper" aria-label="Analysis stages"></ol>
+
+        <div id="progress-track" class="progress-track" role="progressbar"
+             aria-label="Analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+        <p id="progress-status" class="text-muted" aria-live="polite"></p>
+
+        <div id="progress-error" class="form-error-box" hidden>
+          <p id="progress-error-text" role="alert"></p>
+          <div class="button-row">
+            <button id="btn-retry" class="btn btn-primary btn-sm" type="button">Retry</button>
+            <button id="btn-back-start" class="btn btn-secondary btn-sm" type="button">Back to start</button>
           </div>
-          <div class="page-header-actions">
-            <button id="btn-prev-page" class="btn btn-secondary btn-sm" disabled>← Previous</button>
-            <span id="page-indicator" class="page-counter">Page 1 of 10</span>
-            <button id="btn-next-page" class="btn btn-secondary btn-sm">Next →</button>
+        </div>
+      </section>
+
+      <!-- Repo workspace -->
+      <section id="view-workspace" class="view hidden" aria-label="Repository workspace">
+        <header class="repo-header">
+          <div class="repo-title">
+            <h1 id="repo-name"></h1>
+            <a id="repo-url" class="text-muted break" target="_blank" rel="noopener noreferrer" hidden></a>
+          </div>
+          <div class="repo-stats">
+            <span id="repo-score" class="score-pill" aria-live="polite"></span>
+            <ul id="severity-counts" class="severity-row" aria-label="Findings by severity"></ul>
+            <button id="btn-back-repos" class="btn btn-secondary btn-sm" type="button">All repositories</button>
+          </div>
+        </header>
+
+        <nav class="ws-tabs" role="tablist" aria-label="Workspace sections">
+          <button id="tab-graph" class="ws-tab active" type="button" role="tab" data-view="graph"
+                  aria-selected="true" aria-controls="panel-graph">Graph</button>
+          <button id="tab-findings" class="ws-tab" type="button" role="tab" data-view="findings"
+                  aria-selected="false" aria-controls="panel-findings" tabindex="-1">Findings</button>
+          <button id="tab-report" class="ws-tab hidden" type="button" role="tab" data-view="report"
+                  aria-selected="false" aria-controls="panel-report" tabindex="-1">Report</button>
+        </nav>
+
+        <!-- Graph -->
+        <div id="panel-graph" class="ws-panel" role="tabpanel" aria-labelledby="tab-graph">
+          <div class="graph-toolbar">
+            <label class="grow">
+              <span class="sr-only">Search nodes</span>
+              <input id="graph-search" type="search" placeholder="Search files, classes, functions..." autocomplete="off">
+            </label>
+            <label>
+              <span class="sr-only">Layout</span>
+              <select id="graph-layout">
+                <option value="cose">Force</option>
+                <option value="breadthfirst">Hierarchy</option>
+                <option value="concentric">Concentric</option>
+              </select>
+            </label>
+            <button id="btn-layout" class="btn btn-secondary btn-sm" type="button">Re-layout</button>
+            <button id="btn-fit" class="btn btn-secondary btn-sm" type="button">Fit</button>
+            <label class="check">
+              <input id="filter-findings-only" type="checkbox"> Only nodes with findings
+            </label>
+          </div>
+          <div class="graph-filters">
+            <fieldset class="filter-group">
+              <legend>Node types</legend>
+              <label class="check"><input type="checkbox" name="node-type" value="file" checked> File</label>
+              <label class="check"><input type="checkbox" name="node-type" value="class" checked> Class</label>
+              <label class="check"><input type="checkbox" name="node-type" value="function" checked> Function</label>
+              <label class="check"><input type="checkbox" name="node-type" value="method" checked> Method</label>
+              <label class="check"><input type="checkbox" name="node-type" value="external" checked> External</label>
+            </fieldset>
+            <fieldset class="filter-group">
+              <legend>Edges</legend>
+              <label class="check"><input type="checkbox" name="edge-type" value="contains" checked> Contains</label>
+              <label class="check"><input type="checkbox" name="edge-type" value="imports" checked> Imports</label>
+              <label class="check"><input type="checkbox" name="edge-type" value="calls" checked> Calls</label>
+            </fieldset>
+          </div>
+          <p id="graph-status" class="text-muted graph-status" role="status"></p>
+
+          <div class="graph-body">
+            <div class="graph-stage">
+              <div id="graph-canvas" class="graph-canvas" role="img" aria-label="Interactive code graph. Use the search box and filters to narrow it down."></div>
+              <aside class="graph-legend" aria-label="Legend">
+                <h2 class="legend-title">Legend</h2>
+                <ul>
+                  <li><span class="swatch swatch-good"></span> Healthy</li>
+                  <li><span class="swatch swatch-warn"></span> Needs attention</li>
+                  <li><span class="swatch swatch-bad"></span> At risk</li>
+                  <li><span class="shape shape-file"></span> File (rounded box)</li>
+                  <li><span class="shape shape-class"></span> Class (hexagon)</li>
+                  <li><span class="shape shape-function"></span> Function / method (circle)</li>
+                  <li><span class="shape shape-external"></span> External (diamond)</li>
+                  <li><span class="line line-contains"></span> Contains</li>
+                  <li><span class="line line-imports"></span> Imports</li>
+                  <li><span class="line line-calls"></span> Calls</li>
+                </ul>
+                <p class="text-muted small">Size grows with lines of code and connections.</p>
+              </aside>
+            </div>
+
+            <aside id="node-panel" class="node-panel hidden" aria-label="Node details">
+              <div class="node-panel-header">
+                <span class="legend-title">Node details</span>
+                <button id="btn-close-node" class="btn-close" type="button" aria-label="Close node details">&times;</button>
+              </div>
+              <div id="node-panel-content" class="node-panel-content"></div>
+            </aside>
           </div>
         </div>
 
-        <!-- Folder-style tabs -->
-        <div class="folder-tabs" id="folder-tabs" role="tablist" aria-label="Report sections">
-          <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true">📖 Overview</button>
-          <button class="tab-btn" data-tab="repository-map" role="tab" aria-selected="false">🗂️ Repository Map</button>
-          <button class="tab-btn" data-tab="architecture" role="tab" aria-selected="false">🏛️ Architecture</button>
-          <button class="tab-btn" data-tab="routes" role="tab" aria-selected="false">🔌 Routes</button>
-          <button class="tab-btn" data-tab="flows" role="tab" aria-selected="false">⚡ Flows</button>
-          <button class="tab-btn" data-tab="components" role="tab" aria-selected="false">🧩 Components</button>
-          <button class="tab-btn" data-tab="data" role="tab" aria-selected="false">💾 Data</button>
-          <button class="tab-btn" data-tab="gaps" role="tab" aria-selected="false">⚠️ Gaps</button>
-          <button class="tab-btn" data-tab="learn" role="tab" aria-selected="false">📚 Learn</button>
-          <button class="tab-btn" data-tab="teacher" role="tab" aria-selected="false">🎓 Teacher</button>
+        <!-- Findings -->
+        <div id="panel-findings" class="ws-panel hidden" role="tabpanel" aria-labelledby="tab-findings">
+          <div id="findings-summary" class="summary-cards"></div>
+          <div class="findings-controls">
+            <div class="filter-group">
+              <span class="filter-label">Severity</span>
+              <div id="filter-severity" class="chip-row"></div>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Category</span>
+              <div id="filter-category" class="chip-row"></div>
+            </div>
+            <label class="sort-label">Sort by
+              <select id="findings-sort">
+                <option value="severity">Severity</option>
+                <option value="file">File</option>
+                <option value="category">Category</option>
+              </select>
+            </label>
+          </div>
+          <p id="findings-status" class="text-muted" role="status"></p>
+          <ul id="findings-list" class="findings-list"></ul>
+          <p id="findings-empty" class="text-muted hidden">No findings match these filters.</p>
         </div>
 
-        <!-- Filter chips -->
-        <div class="chip-row" id="chip-row" aria-label="Filter findings"></div>
-
-        <!-- Toolbar -->
-        <div class="toolbar-row">
-          <span id="findings-count" class="text-muted">Findings</span>
-          <div class="toolbar-right">
-            <button class="btn btn-secondary btn-sm" id="btn-sort" type="button">Sort: Relevance <span class="sort-caret">▾</span></button>
+        <!-- Report (legacy 10-page analysis; only when the job has an analysis_id) -->
+        <div id="panel-report" class="ws-panel hidden" role="tabpanel" aria-labelledby="tab-report">
+          <div class="page-header-bar">
+            <div>
+              <h2 id="report-title">Project Overview</h2>
+              <p id="report-subtitle" class="text-muted"></p>
+            </div>
+            <div class="page-header-actions">
+              <button id="report-prev" class="btn btn-secondary btn-sm" type="button" disabled>Previous</button>
+              <span id="report-indicator" class="page-counter">Page 1 of 10</span>
+              <button id="report-next" class="btn btn-secondary btn-sm" type="button">Next</button>
+            </div>
           </div>
+          <div id="report-tabs" class="folder-tabs" role="tablist" aria-label="Report sections">
+            <button class="tab-btn active" type="button" role="tab" data-tab="overview" aria-selected="true">Overview</button>
+            <button class="tab-btn" type="button" role="tab" data-tab="repository-map" aria-selected="false">Repository map</button>
+            <button class="tab-btn" type="button" role="tab" data-tab="architecture" aria-selected="false">Architecture</button>
+            <button class="tab-btn" type="button" role="tab" data-tab="routes" aria-selected="false">Routes</button>
+            <button class="tab-btn" type="button" role="tab" data-tab="flows" aria-selected="false">Flows</button>
+            <button class="tab-btn" type="button" role="tab" data-tab="components" aria-selected="false">Components</button>
+            <button class="tab-btn" type="button" role="tab" data-tab="data" aria-selected="false">Data</button>
+            <button class="tab-btn" type="button" role="tab" data-tab="gaps" aria-selected="false">Gaps</button>
+            <button class="tab-btn" type="button" role="tab" data-tab="learn" aria-selected="false">Learn</button>
+            <button class="tab-btn" type="button" role="tab" data-tab="teacher" aria-selected="false">Teacher</button>
+          </div>
+          <div id="report-body" class="page-body"></div>
         </div>
+      </section>
+    </main>
+  </div>
 
-        <!-- Render Target for Active Page -->
-        <div id="page-body" class="page-body">
-          <div id="empty-state" class="empty-state">
-            <div class="empty-icon">🧭</div>
-            <h2 class="empty-title">Explore any codebase</h2>
-            <p class="empty-sub">Paste a repository path and Sherlock will map its architecture, flows, components, data, gaps and mental models.</p>
-            <button id="btn-empty-analyze" class="btn btn-primary" type="button">Analyze Codebase</button>
-          </div>
-
-          <div id="loading-state" class="loading-state">
-            <div class="spinner"></div>
-            <p>Gathering intelligence...</p>
-          </div>
-        </div>
-      </main>
-    </div>
-    </div>
-    </div>
-
-  <!-- Interactive Code Viewer Modal -->
-  <div id="code-modal" class="modal-backdrop hidden">
+  <!-- Source viewer for report file links -->
+  <div id="code-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-filepath">
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title-wrap">
-          <span class="modal-icon">📄</span>
-          <span id="modal-filepath" class="modal-title">Source Viewer</span>
+          <span id="modal-filepath" class="modal-title">Source</span>
         </div>
-        <button id="btn-close-modal" class="btn-close">&times;</button>
+        <button id="btn-close-modal" class="btn-close" type="button" aria-label="Close source viewer">&times;</button>
       </div>
       <div class="modal-body">
         <pre id="modal-code-content" class="code-block"></pre>
@@ -268,43 +248,55 @@
     </div>
   </div>
 
+  <!-- Chat widget (shown once a repo is open) -->
+  <div id="chat-widget" class="chat-widget hidden">
+    <button id="chat-bubble" class="chat-bubble" type="button" title="Ask Sherlock"
+            aria-label="Open repository chat" aria-expanded="false" aria-controls="chat-panel">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </button>
 
-<!-- Sherlock Chat Widget -->
-<div id="chat-widget" class="chat-widget">
-  <div id="chat-bubble" class="chat-bubble" title="Ask Sherlock">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-    </svg>
-  </div>
-  
-  <div id="chat-panel" class="chat-panel hidden">
-    <div class="chat-header">
-      <div class="chat-header-left">
-        <span id="chat-session-title">New Chat</span>
-        <span id="chat-badge" class="chat-badge">●</span>
+    <section id="chat-panel" class="chat-panel hidden" aria-label="Repository chat">
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <span id="chat-session-title">New chat</span>
+        </div>
+        <div class="chat-header-right">
+          <button id="chat-new-chat" class="chat-btn-icon" type="button" title="New chat" aria-label="New chat">+</button>
+          <button id="chat-close" class="chat-btn-icon" type="button" title="Close" aria-label="Close chat">&times;</button>
+        </div>
       </div>
-      <div class="chat-header-right">
-        <button id="chat-new-chat" class="chat-btn-icon" title="New Chat">+</button>
-        <button id="chat-close" class="chat-btn-icon" title="Close">&times;</button>
-      </div>
-    </div>
-    
-    <div id="chat-messages" class="chat-messages">
-      <div class="chat-empty">
-        <p>Start a conversation about your codebase</p>
-      </div>
-    </div>
-    
-    <div class="chat-input-area">
-      <div class="chat-input-wrapper">
-        <input id="chat-input" type="text" placeholder="Ask a question about your code..." />
-        <button id="chat-send" class="chat-btn-send" title="Send">➤</button>
-      </div>
-      <div class="chat-status" id="chat-status"></div>
-    </div>
-  </div>
-</div>
 
+      <div id="chat-focus" class="chat-focus hidden">
+        <span id="chat-focus-label"></span>
+        <button id="chat-focus-clear" class="chat-btn-icon" type="button" aria-label="Remove focus">&times;</button>
+      </div>
+
+      <div id="chat-messages" class="chat-messages" role="log" aria-live="polite">
+        <div class="chat-empty"><p>Ask anything about this repository.</p></div>
+      </div>
+
+      <div class="chat-input-area">
+        <div class="chat-input-wrapper">
+          <label class="sr-only" for="chat-input">Your question</label>
+          <input id="chat-input" type="text" placeholder="Ask a question about the code..." autocomplete="off">
+          <button id="chat-send" class="chat-btn-send" type="button" title="Send" aria-label="Send">&#10148;</button>
+        </div>
+        <div class="chat-status" id="chat-status" role="status"></div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3/dist/cytoscape.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="/util.js"></script>
+  <script src="/api.js"></script>
+  <script src="/node-panel.js"></script>
+  <script src="/graph.js"></script>
+  <script src="/findings.js"></script>
+  <script src="/chat.js"></script>
+  <script src="/report.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
