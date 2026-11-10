@@ -8,60 +8,78 @@
   <title>Log in or sign up — Sherlock</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tokens.css">
   <link rel="stylesheet" href="/site.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
 
-  <header class="site-header">
-    <div class="container">
-      <a class="brand" href="/" aria-label="Sherlock home">
+  <div class="auth-shell">
+    <main id="main" class="auth-main">
+      <div class="auth-top">
+        <a class="brand" href="/" aria-label="Sherlock home">
+          <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+            <circle class="brand-mark-ring" cx="12" cy="12" r="8" fill="none" stroke-width="2.2"/>
+            <line class="brand-mark-handle" x1="18" y1="18" x2="25" y2="25" stroke-width="2.6" stroke-linecap="round"/>
+            <circle class="brand-mark-lens" cx="12" cy="12" r="2.6"/>
+          </svg>
+          Sherlock
+        </a>
+        <a class="btn btn-ghost btn-sm" href="/">Back to home</a>
+      </div>
+
+      <section class="auth-card" aria-labelledby="auth-title">
+        <p class="eyebrow">Sherlock account</p>
+        <h1 id="auth-title">Log in</h1>
+        <p class="lead" id="auth-subtitle">Welcome back. Pick up where you left off.</p>
+
+        <form class="auth-form" id="auth-form" novalidate>
+          <div class="field">
+            <label for="auth-email">Email</label>
+            <input class="input" id="auth-email" name="email" type="email" autocomplete="email"
+                   inputmode="email" spellcheck="false" required aria-describedby="auth-error">
+          </div>
+
+          <div class="field">
+            <label for="auth-password">Password</label>
+            <input class="input" id="auth-password" name="password" type="password"
+                   autocomplete="current-password" required aria-describedby="password-rules auth-error">
+            <ul class="password-rules" id="password-rules" hidden>
+              <li data-rule="length">At least 10 characters</li>
+              <li data-rule="letter">Contains a letter</li>
+              <li data-rule="digit">Contains a number</li>
+            </ul>
+          </div>
+
+          <p class="form-error" id="auth-error" role="alert"></p>
+          <button class="btn btn-primary btn-block" id="auth-submit" type="submit">Log in</button>
+        </form>
+
+        <p class="auth-switch">
+          <span id="auth-switch-text">New to Sherlock?</span>
+          <a id="auth-switch-link" href="/signup">Create an account</a>
+        </p>
+      </section>
+    </main>
+
+    <aside class="auth-panel" aria-label="About Sherlock">
+      <a class="brand" href="/">
         <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
-          <circle cx="12" cy="12" r="8" fill="none" stroke="#5f7a54" stroke-width="2.2"/>
-          <line x1="18" y1="18" x2="25" y2="25" stroke="#5f7a54" stroke-width="2.6" stroke-linecap="round"/>
-          <circle cx="12" cy="12" r="2.6" fill="#7c9a6d"/>
+          <circle class="brand-mark-ring" cx="12" cy="12" r="8" fill="none" stroke-width="2.2"/>
+          <line class="brand-mark-handle" x1="18" y1="18" x2="25" y2="25" stroke-width="2.6" stroke-linecap="round"/>
+          <circle class="brand-mark-lens" cx="12" cy="12" r="2.6"/>
         </svg>
         Sherlock
       </a>
-      <a class="btn btn-ghost btn-sm" href="/">Back to home</a>
-    </div>
-  </header>
-
-  <main id="main" class="auth-main">
-    <section class="auth-card" aria-labelledby="auth-title">
-      <p class="eyebrow">Sherlock account</p>
-      <h1 id="auth-title">Log in</h1>
-      <p class="lead" id="auth-subtitle">Welcome back. Pick up where you left off.</p>
-
-      <form class="auth-form" id="auth-form" novalidate>
-        <div class="field">
-          <label for="auth-email">Email</label>
-          <input class="input" id="auth-email" name="email" type="email" autocomplete="email"
-                 inputmode="email" spellcheck="false" required aria-describedby="auth-error">
-        </div>
-
-        <div class="field">
-          <label for="auth-password">Password</label>
-          <input class="input" id="auth-password" name="password" type="password"
-                 autocomplete="current-password" required aria-describedby="password-rules auth-error">
-          <ul class="password-rules" id="password-rules" hidden>
-            <li data-rule="length">At least 10 characters</li>
-            <li data-rule="letter">Contains a letter</li>
-            <li data-rule="digit">Contains a number</li>
-          </ul>
-        </div>
-
-        <p class="form-error" id="auth-error" role="alert"></p>
-        <button class="btn btn-primary btn-block" id="auth-submit" type="submit">Log in</button>
-      </form>
-
-      <p class="auth-switch">
-        <span id="auth-switch-text">New to Sherlock?</span>
-        <a id="auth-switch-link" href="/signup">Create an account</a>
-      </p>
-    </section>
-  </main>
+      <p class="auth-panel-title">Your repositories and chats stay private to your account.</p>
+      <ul class="auth-facts">
+        <li><span class="mono-label">Graph</span><span>Files, classes, functions and calls for seven languages, as an explorable map.</span></li>
+        <li><span class="mono-label">Evidence</span><span>Security rules with CWE IDs, secret detection, quality hotspots and OSV dependency checks.</span></li>
+        <li><span class="mono-label">Interview</span><span>Chat scoped to any node, with answers that cite the files they came from.</span></li>
+      </ul>
+    </aside>
+  </div>
 
   <script src="/site.js" defer></script>
   <script src="/auth.js" defer></script>

@@ -8,7 +8,8 @@
   <title>Settings — Sherlock</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tokens.css">
   <link rel="stylesheet" href="/site.css">
 </head>
 <body>
@@ -18,13 +19,13 @@
     <div class="container">
       <a class="brand" href="/" aria-label="Sherlock home">
         <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
-          <circle cx="12" cy="12" r="8" fill="none" stroke="#5f7a54" stroke-width="2.2"/>
-          <line x1="18" y1="18" x2="25" y2="25" stroke="#5f7a54" stroke-width="2.6" stroke-linecap="round"/>
-          <circle cx="12" cy="12" r="2.6" fill="#7c9a6d"/>
+          <circle class="brand-mark-ring" cx="12" cy="12" r="8" fill="none" stroke-width="2.2"/>
+          <line class="brand-mark-handle" x1="18" y1="18" x2="25" y2="25" stroke-width="2.6" stroke-linecap="round"/>
+          <circle class="brand-mark-lens" cx="12" cy="12" r="2.6"/>
         </svg>
         Sherlock
       </a>
-      <nav class="nav-auth" aria-label="Account">
+      <nav class="nav-auth is-end" aria-label="Account">
         <a class="btn btn-ghost btn-sm" href="/app">Open app</a>
         <button type="button" class="btn btn-secondary btn-sm" data-action="logout">Log out</button>
       </nav>
@@ -32,116 +33,133 @@
   </header>
 
   <main id="main" class="settings-main">
-    <div class="container">
-      <h1>Settings</h1>
+    <div class="container settings-layout">
+      <aside class="settings-nav" aria-label="Settings sections">
+        <ul>
+          <li><a href="#account">Account</a></li>
+          <li><a href="#usage">Usage</a></li>
+          <li><a href="#keys">API keys</a></li>
+          <li><a href="#billing">Billing</a></li>
+        </ul>
+      </aside>
 
-      <div id="checkout-banner" class="banner" role="status" hidden></div>
+      <div class="settings-content">
+        <h1 class="settings-title">Settings</h1>
 
-      <!-- Account -->
-      <section class="panel" id="account" aria-labelledby="account-title">
-        <div class="panel-head">
-          <h2 id="account-title">Account</h2>
-          <button type="button" class="btn btn-ghost btn-sm" data-action="logout">Log out</button>
-        </div>
-        <dl class="kv">
-          <dt>Email</dt>
-          <dd id="account-email">Loading…</dd>
-          <dt>Plan</dt>
-          <dd><span class="plan-badge" id="account-plan">—</span></dd>
-          <dt>Member since</dt>
-          <dd id="account-since">—</dd>
-        </dl>
+        <div id="checkout-banner" class="banner" role="status" hidden></div>
 
-        <h3>Usage this period</h3>
-        <div class="usage-list">
-          <div class="usage-row">
-            <div class="usage-meta">
-              <span id="usage-analyses-label">Repository analyses (this month)</span>
-              <span id="usage-analyses-value">—</span>
-            </div>
-            <progress id="usage-analyses" max="1" value="0" aria-labelledby="usage-analyses-label"></progress>
+        <!-- Account -->
+        <section class="settings-section" id="account" aria-labelledby="account-title">
+          <div class="settings-section-head">
+            <h2 id="account-title">Account</h2>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="logout">Log out</button>
           </div>
-          <div class="usage-row">
-            <div class="usage-meta">
-              <span id="usage-chat-label">Chat messages (today)</span>
-              <span id="usage-chat-value">—</span>
-            </div>
-            <progress id="usage-chat" max="1" value="0" aria-labelledby="usage-chat-label"></progress>
+          <dl class="kv">
+            <dt>Email</dt>
+            <dd id="account-email">Loading…</dd>
+            <dt>Plan</dt>
+            <dd><span class="plan-badge" id="account-plan">—</span></dd>
+            <dt>Member since</dt>
+            <dd id="account-since">—</dd>
+          </dl>
+          <p class="form-error" id="account-error" role="alert"></p>
+        </section>
+
+        <!-- Usage -->
+        <section class="settings-section" id="usage" aria-labelledby="usage-title">
+          <div class="settings-section-head">
+            <h2 id="usage-title">Usage</h2>
           </div>
-        </div>
-        <p class="form-error" id="account-error" role="alert"></p>
-      </section>
+          <p>Your use so far against your plan limits.</p>
+          <div class="usage-list">
+            <div class="usage-row">
+              <div class="usage-meta">
+                <span id="usage-analyses-label">Repository analyses (this month)</span>
+                <span id="usage-analyses-value">—</span>
+              </div>
+              <progress class="meter" id="usage-analyses" max="1" value="0" aria-labelledby="usage-analyses-label"></progress>
+            </div>
+            <div class="usage-row">
+              <div class="usage-meta">
+                <span id="usage-chat-label">Chat messages (today)</span>
+                <span id="usage-chat-value">—</span>
+              </div>
+              <progress class="meter" id="usage-chat" max="1" value="0" aria-labelledby="usage-chat-label"></progress>
+            </div>
+          </div>
+        </section>
 
-      <!-- API keys (BYOK) -->
-      <section class="panel" id="keys" aria-labelledby="keys-title">
-        <div class="panel-head">
-          <h2 id="keys-title">API keys</h2>
-        </div>
-        <p>Bring your own key to run chat with your provider account. Keys are encrypted at rest and are never shown again after you save them; only a short hint is displayed. Saving a provider again replaces its key.</p>
+        <!-- API keys (BYOK) -->
+        <section class="settings-section" id="keys" aria-labelledby="keys-title">
+          <div class="settings-section-head">
+            <h2 id="keys-title">API keys</h2>
+          </div>
+          <p>Bring your own key to run chat with your provider account. Keys are encrypted at rest and are never shown again after you save them; only a short hint is displayed. Saving a provider again replaces its key.</p>
 
-        <p class="muted" id="keys-empty" hidden>No keys saved. Chat uses the platform model until you add one.</p>
-        <ul class="keys-list" id="keys-list" aria-live="polite"></ul>
+          <p class="muted" id="keys-empty" hidden>No keys saved. Chat uses the platform model until you add one.</p>
+          <ul class="keys-list" id="keys-list" aria-live="polite"></ul>
 
-        <form class="key-form" id="key-form" novalidate>
-          <h3>Add or replace a key</h3>
-          <div class="form-grid">
+          <form class="key-form" id="key-form" novalidate>
+            <h3>Add or replace a key</h3>
+            <div class="form-grid">
+              <div class="field">
+                <label for="key-provider">Provider</label>
+                <select class="select" id="key-provider" name="provider" required></select>
+              </div>
+              <div class="field">
+                <label for="key-model">Model <span class="muted">(optional)</span></label>
+                <input class="input" id="key-model" name="model" type="text" autocomplete="off" spellcheck="false">
+              </div>
+            </div>
+            <div class="field" id="key-base-wrap" hidden>
+              <label for="key-base-url">Base URL</label>
+              <input class="input" id="key-base-url" name="base_url" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+                     placeholder="https://api.example.com/v1" aria-describedby="key-base-help">
+              <p class="help" id="key-base-help">Must be a public https endpoint that speaks the OpenAI chat API.</p>
+            </div>
             <div class="field">
-              <label for="key-provider">Provider</label>
-              <select class="select" id="key-provider" name="provider" required></select>
+              <label for="key-api">API key</label>
+              <input class="input" id="key-api" name="api_key" type="password" autocomplete="off" spellcheck="false" required aria-describedby="key-error">
             </div>
-            <div class="field">
-              <label for="key-model">Model <span class="muted">(optional)</span></label>
-              <input class="input" id="key-model" name="model" type="text" autocomplete="off" spellcheck="false">
+            <p class="form-error" id="key-error" role="alert"></p>
+            <p class="form-status" id="key-status" role="status"></p>
+            <div class="form-actions">
+              <button class="btn btn-primary" id="key-submit" type="submit">Save key</button>
             </div>
+          </form>
+        </section>
+
+        <!-- Billing -->
+        <section class="settings-section" id="billing" aria-labelledby="billing-title">
+          <div class="settings-section-head">
+            <h2 id="billing-title">Billing</h2>
+            <span class="plan-badge" id="billing-plan">—</span>
           </div>
-          <div class="field" id="key-base-wrap" hidden>
-            <label for="key-base-url">Base URL</label>
-            <input class="input" id="key-base-url" name="base_url" type="url" inputmode="url" autocomplete="off" spellcheck="false"
-                   placeholder="https://api.example.com/v1" aria-describedby="key-base-help">
-            <p class="help" id="key-base-help">Must be a public https endpoint that speaks the OpenAI chat API.</p>
-          </div>
-          <div class="field">
-            <label for="key-api">API key</label>
-            <input class="input" id="key-api" name="api_key" type="password" autocomplete="off" spellcheck="false" required aria-describedby="key-error">
-          </div>
-          <p class="form-error" id="key-error" role="alert"></p>
-          <p class="form-status" id="key-status" role="status"></p>
+          <p id="billing-summary">Loading billing details…</p>
+
           <div class="form-actions">
-            <button class="btn btn-primary" id="key-submit" type="submit">Save key</button>
+            <button class="btn btn-primary" id="upgrade-btn" type="button" hidden>Upgrade to Pro</button>
           </div>
-        </form>
-      </section>
+          <p class="form-error" id="billing-error" role="alert"></p>
 
-      <!-- Billing -->
-      <section class="panel" id="billing" aria-labelledby="billing-title">
-        <div class="panel-head">
-          <h2 id="billing-title">Billing</h2>
-          <span class="plan-badge" id="billing-plan">—</span>
-        </div>
-        <p id="billing-summary">Loading billing details…</p>
-
-        <div class="form-actions">
-          <button class="btn btn-primary" id="upgrade-btn" type="button" hidden>Upgrade to Pro</button>
-        </div>
-        <p class="form-error" id="billing-error" role="alert"></p>
-
-        <h3>Payments</h3>
-        <p class="muted" id="payments-empty" hidden>No payments yet.</p>
-        <div class="table-wrap">
-          <table class="payments-table" id="payments-table" hidden>
-            <caption class="sr-only">Payment history</caption>
-            <thead>
-              <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Plan</th>
-                <th scope="col">Amount</th>
-                <th scope="col">Status</th>
-              </tr>
-            </thead>
-            <tbody id="payments-body"></tbody>
-          </table>
-        </div>
-      </section>
+          <h3>Payments</h3>
+          <p class="muted" id="payments-empty" hidden>No payments yet.</p>
+          <div class="table-wrap">
+            <table class="payments-table" id="payments-table" hidden>
+              <caption class="sr-only">Payment history</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Plan</th>
+                  <th scope="col">Amount</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody id="payments-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </div>
   </main>
 

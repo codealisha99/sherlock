@@ -131,6 +131,12 @@
   input.addEventListener("input", function () {
     if (errorEl.textContent) setRepoError("");
   });
+  // Closing band: send the visitor back to the hero form instead of duplicating it.
+  document.getElementById("cta-start").addEventListener("click", function (event) {
+    event.preventDefault();
+    input.scrollIntoView({ block: "center" });
+    input.focus({ preventScroll: true });
+  });
 
   Sherlock.initNav().then(function (me) {
     currentUser = me;

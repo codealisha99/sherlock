@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Sherlock turns any GitHub repository into an AST graph with embeddings, a security and code-quality scan, and a chat that can answer questions about any node.">
+  <meta name="description" content="Sherlock maps any GitHub repository as a code graph, marks security, quality and dependency (OSV) findings on it, and answers questions about any node with file citations.">
   <meta name="color-scheme" content="light">
-  <title>Sherlock — Understand any codebase, node by node</title>
+  <title>Sherlock — See where a codebase is weak before you read it</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tokens.css">
   <link rel="stylesheet" href="/site.css">
 </head>
 <body>
@@ -18,27 +19,35 @@
     <div class="container">
       <a class="brand" href="/" aria-label="Sherlock home">
         <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
-          <circle cx="12" cy="12" r="8" fill="none" stroke="#5f7a54" stroke-width="2.2"/>
-          <line x1="18" y1="18" x2="25" y2="25" stroke="#5f7a54" stroke-width="2.6" stroke-linecap="round"/>
-          <circle cx="12" cy="12" r="2.6" fill="#7c9a6d"/>
+          <circle class="brand-mark-ring" cx="12" cy="12" r="8" fill="none" stroke-width="2.2"/>
+          <line class="brand-mark-handle" x1="18" y1="18" x2="25" y2="25" stroke-width="2.6" stroke-linecap="round"/>
+          <circle class="brand-mark-lens" cx="12" cy="12" r="2.6"/>
         </svg>
         Sherlock
       </a>
 
-      <nav class="nav-links" aria-label="Primary">
-        <a class="nav-section" href="#features">Features</a>
-        <a class="nav-section" href="#how-it-works">How it works</a>
-        <a class="nav-section" href="#security">Security</a>
-        <a class="nav-section" href="#pricing">Pricing</a>
+      <nav class="nav-links" id="site-nav" aria-label="Primary">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#security">Security</a>
+        <a href="#pricing">Pricing</a>
+        <a class="nav-mobile-only" href="/login" data-auth="guest">Log in</a>
+        <a class="nav-mobile-only" href="/app" data-auth="user" hidden>Open app</a>
+        <a class="nav-mobile-only" href="/settings" data-auth="user" hidden>Settings</a>
+        <button type="button" class="nav-mobile-only nav-logout" data-action="logout" data-auth="user" hidden>Log out</button>
       </nav>
 
       <div class="nav-auth">
-        <a class="btn btn-ghost btn-sm" href="/login" data-auth="guest">Log in</a>
+        <a class="btn btn-ghost btn-sm nav-desktop-only" href="/login" data-auth="guest">Log in</a>
         <a class="btn btn-primary btn-sm" href="/signup" data-auth="guest">Get started</a>
-        <a class="btn btn-ghost btn-sm" href="/app" data-auth="user" hidden>Open app</a>
-        <a class="btn btn-ghost btn-sm" href="/settings" data-auth="user" hidden>Settings</a>
-        <button type="button" class="btn btn-secondary btn-sm" data-action="logout" data-auth="user" hidden>Log out</button>
+        <a class="btn btn-ghost btn-sm nav-desktop-only" href="/app" data-auth="user" hidden>Open app</a>
+        <a class="btn btn-ghost btn-sm nav-desktop-only" href="/settings" data-auth="user" hidden>Settings</a>
+        <button type="button" class="btn btn-secondary btn-sm nav-desktop-only" data-action="logout" data-auth="user" hidden>Log out</button>
       </div>
+
+      <button type="button" class="btn btn-ghost btn-sm nav-toggle" aria-expanded="false" aria-controls="site-nav">
+        <span class="nav-toggle-icon" aria-hidden="true"></span>Menu
+      </button>
     </div>
   </header>
 
@@ -47,9 +56,9 @@
     <section class="hero" aria-labelledby="hero-title">
       <div class="container hero-grid">
         <div>
-          <p class="eyebrow">Codebase intelligence</p>
-          <h1 id="hero-title">Read a codebase like a <em>detective</em> reads a case file.</h1>
-          <p class="lead">Paste a GitHub repository. Sherlock builds a code graph and vector embeddings, scans for vulnerabilities and code-quality hotspots, checks dependencies against the OSV vulnerability database, and lets you ask questions about any file, function or class.</p>
+          <p class="eyebrow">Code analysis for repositories you did not write</p>
+          <h1 id="hero-title">See where a codebase is <em>weak</em> before you read a line of it.</h1>
+          <p class="lead">Paste a GitHub repository. Sherlock maps its code, marks security, quality and dependency findings on that map, and lets you ask about any node with the file it came from.</p>
 
           <form class="repo-form" id="repo-form" novalidate>
             <div class="repo-form-row">
@@ -61,160 +70,335 @@
             <p class="help" id="repo-help">Repositories on github.com. Sherlock makes a shallow clone and reads the code.</p>
             <p class="form-error" id="repo-error" role="alert"></p>
           </form>
-          <p class="hero-note">The Free plan includes monthly analyses and daily chat. See pricing below.</p>
+
+          <div class="hero-actions">
+            <p class="hero-note">Free covers evaluation with monthly analyses and daily chat.</p>
+            <a class="hero-link" href="#how-it-works">See how it works</a>
+          </div>
         </div>
 
-        <figure class="graph-card">
-          <svg viewBox="0 0 480 340" role="img" aria-labelledby="graph-title graph-desc">
-            <title id="graph-title">Illustrative dependency graph</title>
-            <desc id="graph-desc">A small graph of files and functions. Most nodes are healthy. One function is flagged as vulnerable and two are flagged as warnings.</desc>
-            <!-- edges -->
-            <line class="g-edge" x1="90" y1="80" x2="230" y2="60"/>
-            <line class="g-edge g-edge-flag" x1="230" y1="60" x2="360" y2="120"/>
-            <line class="g-edge" x1="90" y1="80" x2="160" y2="190"/>
-            <line class="g-edge" x1="160" y1="190" x2="320" y2="230"/>
-            <line class="g-edge" x1="320" y1="230" x2="410" y2="268"/>
-            <line class="g-edge" x1="160" y1="190" x2="90" y2="284"/>
-            <line class="g-edge" x1="160" y1="190" x2="250" y2="300"/>
-            <line class="g-edge" x1="250" y1="300" x2="320" y2="230"/>
-            <line class="g-edge g-edge-flag" x1="360" y1="120" x2="320" y2="230"/>
-            <!-- nodes -->
-            <circle class="g-node g-node-good" cx="90" cy="80" r="20"/>
-            <circle class="g-node g-node-warn" cx="230" cy="60" r="18"/>
-            <circle class="g-node g-node-bad" cx="360" cy="120" r="19"/>
-            <circle class="g-node g-node-good" cx="160" cy="190" r="22"/>
-            <circle class="g-node g-node-good" cx="320" cy="230" r="18"/>
-            <circle class="g-node g-node-good" cx="410" cy="268" r="16"/>
-            <circle class="g-node g-node-warn" cx="90" cy="284" r="17"/>
-            <circle class="g-node g-node-good" cx="250" cy="300" r="16"/>
-            <!-- labels -->
-            <text class="g-label" x="90" y="118" text-anchor="middle">routes.py</text>
-            <text class="g-label" x="230" y="34" text-anchor="middle">auth.py</text>
-            <text class="g-label" x="360" y="158" text-anchor="middle">login()</text>
-            <text class="g-label" x="160" y="228" text-anchor="middle">storage.py</text>
-            <text class="g-label" x="320" y="268" text-anchor="middle">chat.py</text>
-            <text class="g-label" x="410" y="300" text-anchor="middle">graph.py</text>
-            <text class="g-label" x="90" y="320" text-anchor="middle">embed()</text>
-            <text class="g-label" x="250" y="334" text-anchor="middle">scanner.py</text>
-          </svg>
-          <figcaption>
-            <span class="legend">
-              <span class="legend-item"><span class="dot dot-good" aria-hidden="true"></span>Healthy</span>
-              <span class="legend-item"><span class="dot dot-warn" aria-hidden="true"></span>Lagging</span>
-              <span class="legend-item"><span class="dot dot-bad" aria-hidden="true"></span>Vulnerable</span>
-            </span>
-            <span>Illustrative example</span>
+        <figure class="case">
+          <div class="case-stage">
+            <div class="case-map">
+              <svg class="case-graph" viewBox="0 0 560 460" role="img" aria-labelledby="case-title case-desc">
+                <title id="case-title">Example: a code graph of pallets/itsdangerous with one flagged file</title>
+                <desc id="case-desc">Seven nodes from the itsdangerous package. Signer.sign calls want_bytes and Signer.get_signature, and both are contained in the Signer class. The signer.py file is flagged amber because it has a medium security finding. Two other files import from it.</desc>
+                <line class="case-edge" pathLength="1" x1="80" y1="80" x2="160" y2="190" style="--d: 200ms"/>
+                <line class="case-edge" pathLength="1" x1="250" y1="70" x2="160" y2="190" style="--d: 290ms"/>
+                <line class="case-edge" pathLength="1" x1="160" y1="190" x2="110" y2="300" style="--d: 380ms"/>
+                <line class="case-edge" pathLength="1" x1="110" y1="300" x2="70" y2="400" style="--d: 470ms"/>
+                <line class="case-edge" pathLength="1" x1="110" y1="300" x2="210" y2="400" style="--d: 470ms"/>
+                <line class="case-edge" pathLength="1" x1="70" y1="400" x2="290" y2="310" style="--d: 560ms"/>
+                <line class="case-edge" pathLength="1" x1="70" y1="400" x2="210" y2="400" style="--d: 560ms"/>
+                <circle class="case-node" cx="80" cy="80" r="14" style="--d: 120ms"/>
+                <circle class="case-node" cx="250" cy="70" r="14" style="--d: 210ms"/>
+                <circle class="case-ring" cx="160" cy="190" r="20" style="--d: 1100ms"/>
+                <circle class="case-node is-flag" cx="160" cy="190" r="20" style="--d: 900ms"/>
+                <circle class="case-node" cx="110" cy="300" r="12" style="--d: 640ms"/>
+                <circle class="case-node" cx="70" cy="400" r="11" style="--d: 760ms"/>
+                <circle class="case-node" cx="210" cy="400" r="11" style="--d: 760ms"/>
+                <circle class="case-node" cx="290" cy="310" r="11" style="--d: 840ms"/>
+                <line class="case-leader" pathLength="1" x1="160" y1="190" x2="358" y2="190" style="--d: 1400ms"/>
+              </svg>
+              <span class="case-label lbl-1" style="--d: 300ms">serializer.py</span>
+              <span class="case-label lbl-2" style="--d: 380ms">timed.py</span>
+              <span class="case-label is-flag lbl-3" style="--d: 1000ms">signer.py</span>
+              <span class="case-label lbl-4" style="--d: 740ms">Signer</span>
+              <span class="case-label lbl-5" style="--d: 860ms">Signer.sign</span>
+              <span class="case-label lbl-6" style="--d: 860ms">Signer.get_signature</span>
+              <span class="case-label lbl-7" style="--d: 940ms">want_bytes</span>
+            </div>
+
+            <div class="case-finding" style="--d: 1600ms">
+              <div class="case-finding-meta">
+                <span class="chip sev sev-medium">Medium</span>
+                <span class="chip">Security</span>
+                <span class="chip">CWE-327</span>
+              </div>
+              <p class="case-finding-title">Weak hash algorithm (MD5/SHA-1)</p>
+              <p class="case-finding-path">src/<wbr>itsdangerous/<wbr>signer.py:45</p>
+            </div>
+
+            <div class="case-ask" style="--d: 1900ms">
+              <span class="chip">Ask about this</span>
+              <p>Is MD5 still used for anything security-sensitive here?</p>
+            </div>
+          </div>
+
+          <figcaption class="case-caption">
+            <span class="eyebrow">Example: pallets/itsdangerous</span>
+            <span class="legend-key"><span class="legend-dot is-flag" aria-hidden="true"></span>Flagged file</span>
+            <span class="legend-key"><span class="legend-dot" aria-hidden="true"></span>No findings</span>
+            <span>Answers cite the files they came from.</span>
           </figcaption>
         </figure>
       </div>
     </section>
 
+    <!-- Problem and approach -->
+    <section class="section" id="approach" aria-labelledby="approach-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">The problem</p>
+          <h2 id="approach-title">Reading a new codebase starts blind.</h2>
+        </div>
+        <div class="versus">
+          <div class="versus-col" data-reveal>
+            <p class="versus-label">Without Sherlock</p>
+            <ul>
+              <li>Grep for an entry point and follow imports by hand.</li>
+              <li>Open files one at a time and lose the thread between them.</li>
+              <li>Guess which module matters, and which one is quietly unsafe.</li>
+              <li>Skim the test folder to see what is covered.</li>
+            </ul>
+          </div>
+          <div class="versus-col is-with" data-reveal style="--i: 1">
+            <p class="versus-label">With Sherlock</p>
+            <ul>
+              <li>One map of files, classes, functions and calls.</li>
+              <li>Findings pinned to the nodes they belong to.</li>
+              <li>Questions answered with citations to the files they came from.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- How it works -->
-    <section class="section band" id="how-it-works" aria-labelledby="how-title">
+    <section class="section" id="how-it-works" aria-labelledby="how-title">
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">How it works</p>
-          <h2 id="how-title">From URL to answers in four steps.</h2>
-          <p>Each step runs on the server against a shallow clone. You watch progress in the workspace and can stop reading at any point.</p>
+          <h2 id="how-title">Six stages build the map. Then you ask.</h2>
+          <p>Each stage runs on the server against a shallow clone. You can watch progress in the workspace and stop reading at any point.</p>
         </div>
-        <ol class="steps">
-          <li class="step">
-            <span class="step-num" aria-hidden="true">1</span>
-            <h3>Paste a URL</h3>
-            <p>Give Sherlock a github.com repository. It makes a shallow clone with size limits.</p>
+        <ol class="process">
+          <li class="process-step" data-reveal>
+            <span class="process-num" aria-hidden="true">01</span>
+            <h3>Cloning</h3>
+            <p>Shallow clone of a github.com repository, size-capped, with git hooks disabled.</p>
           </li>
-          <li class="step">
-            <span class="step-num" aria-hidden="true">2</span>
-            <h3>Build the graph</h3>
-            <p>Files, classes, functions, methods and imports become a code graph for Python, JavaScript, TypeScript, Go, Java, Rust and Ruby. Code chunks get vector embeddings for search.</p>
+          <li class="process-step" data-reveal style="--i: 1">
+            <span class="process-num" aria-hidden="true">02</span>
+            <h3>Indexing</h3>
+            <p>Files, classes, functions, methods, imports and calls parsed for seven languages.</p>
           </li>
-          <li class="step">
-            <span class="step-num" aria-hidden="true">3</span>
-            <h3>Scan the code</h3>
-            <p>Security rules, secret detection, dependency checks against the OSV database, and quality metrics such as complexity and test gaps.</p>
+          <li class="process-step" data-reveal style="--i: 2">
+            <span class="process-num" aria-hidden="true">03</span>
+            <h3>Embedding</h3>
+            <p>Code chunks get vector embeddings for search.</p>
           </li>
-          <li class="step">
-            <span class="step-num" aria-hidden="true">4</span>
-            <h3>Explore, verify and ask</h3>
-            <p>Click any node to see its findings and source. Have a model verify findings, and chat with the repository, scoped to that node, with citations.</p>
+          <li class="process-step" data-reveal style="--i: 3">
+            <span class="process-num" aria-hidden="true">04</span>
+            <h3>Scanning</h3>
+            <p>Security rules with CWE IDs, secret detection, complexity, file size and missing tests.</p>
+          </li>
+          <li class="process-step" data-reveal style="--i: 4">
+            <span class="process-num" aria-hidden="true">05</span>
+            <h3>Checking dependencies</h3>
+            <p>Manifests and lockfiles checked against OSV.dev advisories.</p>
+          </li>
+          <li class="process-step" data-reveal style="--i: 5">
+            <span class="process-num" aria-hidden="true">06</span>
+            <h3>Graphing</h3>
+            <p>Findings are mapped onto the graph nodes they belong to.</p>
+          </li>
+          <li class="process-step is-final" data-reveal style="--i: 6">
+            <span class="process-num" aria-hidden="true">07</span>
+            <h3>Explore &amp; ask</h3>
+            <p>Open any node and its source, verify findings with a model, and chat with citations.</p>
           </li>
         </ol>
       </div>
     </section>
 
-    <!-- Features -->
+    <!-- Features: exhibits -->
     <section class="section" id="features" aria-labelledby="features-title">
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">Features</p>
-          <h2 id="features-title">Everything you need to get oriented in a new repo.</h2>
+          <h2 id="features-title">The case file, exhibit by exhibit.</h2>
+          <p>Four views of the same repository. Each one points back to the code it came from.</p>
         </div>
-        <div class="feature-grid">
-          <article class="card">
-            <span class="tag tag-sage">Graph</span>
-            <h3>Interactive AST graph</h3>
-            <p>Navigate files, classes, functions and their calls and imports. Filter by health, follow edges, and jump to the source line.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag-blush">Security</span>
-            <h3>Vulnerability scanner with CWE mapping</h3>
-            <p>Findings carry a severity, a snippet, a recommendation and a CWE identifier where one applies, so you can triage with a shared vocabulary.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag-butter">Quality</span>
-            <h3>Lagging-code hotspots</h3>
-            <p>See where complexity, file size and missing tests concentrate. Hotspots show up on the graph, not buried in a report.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag-sky">Dependencies</span>
-            <h3>Dependency CVE checks</h3>
-            <p>Versions pinned in your manifests and lockfiles are checked against the OSV.dev vulnerability database. Each finding lists its advisory IDs and the fixed version when one is known.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag-lavender">Verify</span>
-            <h3>AI verification of findings</h3>
-            <p>A model gives each checked finding a verdict (confirmed, likely, false positive or uncertain), a confidence score, an explanation and a suggested fix. Use your own key, or the platform model within your plan's limits.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag-butter">Languages</span>
-            <h3>Python, JavaScript/TypeScript, Go, Java, Rust, Ruby</h3>
-            <p>Classes, functions, methods, imports and simple call relationships appear in the graph for each supported language, with the same filters, search and node details.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag-lavender">Chat</span>
-            <h3>Chat on any node</h3>
-            <p>Ask why a function exists or how a flow works. Answers cite the files they came from, and the chat is scoped to the node you are viewing.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag-sky">Keys</span>
-            <h3>Bring your own API key</h3>
-            <p>Use OpenAI, Anthropic, Groq, OpenRouter or any OpenAI-compatible endpoint. Your key is used for your requests only.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag-sage">Privacy</span>
-            <h3>Private to your account</h3>
-            <p>Repositories, findings and chats belong to the account that created them. Other users cannot list or open them.</p>
-          </article>
-        </div>
+
+        <article class="exhibit" data-reveal>
+          <div class="exhibit-copy">
+            <p class="exhibit-label">Exhibit A</p>
+            <h3>The map</h3>
+            <p>An interactive graph of the repository: files, classes, functions, methods, imports and calls, for Python, JavaScript, TypeScript, Go, Java, Rust and Ruby.</p>
+            <ul class="ticks">
+              <li>Nodes and edges for every supported language, with the same filters and search.</li>
+              <li>Filter by health, follow an edge, and select any node to see its findings and source.</li>
+              <li>Jump from a node to the source line it was parsed from.</li>
+            </ul>
+          </div>
+          <div class="art">
+            <div class="art-head"><span>Graph</span><span>7 languages</span></div>
+            <p class="art-legend">
+              <span class="legend-key"><span class="legend-dot" aria-hidden="true"></span>No findings</span>
+              <span class="legend-key"><span class="legend-dot is-flag" aria-hidden="true"></span>Has findings</span>
+            </p>
+            <svg class="map-svg" viewBox="0 0 300 170" focusable="false">
+              <line class="map-edge" x1="40" y1="45" x2="130" y2="35"/>
+              <line class="map-edge" x1="130" y1="35" x2="230" y2="75"/>
+              <line class="map-edge" x1="130" y1="35" x2="120" y2="115"/>
+              <line class="map-edge" x1="120" y1="115" x2="230" y2="140"/>
+              <line class="map-edge" x1="230" y1="75" x2="230" y2="140"/>
+              <circle class="map-node" cx="40" cy="45" r="11"/>
+              <circle class="map-node" cx="130" cy="35" r="13"/>
+              <circle class="map-node is-flag" cx="120" cy="115" r="14"/>
+              <circle class="map-node" cx="230" cy="75" r="11"/>
+              <circle class="map-node" cx="230" cy="140" r="10"/>
+            </svg>
+            <div class="map-source">
+              <span class="mono">src/<wbr>itsdangerous/<wbr>signer.py:45</span>
+              <span>Flagged node</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="exhibit is-flip" data-reveal>
+          <div class="exhibit-copy">
+            <p class="exhibit-label">Exhibit B</p>
+            <h3>The evidence</h3>
+            <p>A scanner that reports where code is weak. Each finding carries a severity, a snippet, a recommendation and the rule it came from.</p>
+            <ul class="ticks">
+              <li>Security rules, with a CWE identifier where one applies.</li>
+              <li>Secret detection, plus quality hotspots: complexity, file size and missing tests.</li>
+              <li>Dependency checks against OSV.dev, with advisory IDs and the fixed version when one is known.</li>
+            </ul>
+          </div>
+          <div class="art">
+            <div class="art-head"><span>Findings</span><span>Example: pallets/itsdangerous</span></div>
+            <ul class="ledger-rows">
+              <li class="ledger-row">
+                <span class="chip sev sev-medium">Medium</span>
+                <div>
+                  <p class="ledger-title">Weak hash algorithm (MD5/SHA-1)</p>
+                  <p class="ledger-path">src/itsdangerous/signer.py:45</p>
+                </div>
+                <span class="chip">CWE-327</span>
+              </li>
+              <li class="ledger-row">
+                <span class="chip sev sev-low">Low</span>
+                <div>
+                  <p class="ledger-title">Module without matching tests</p>
+                  <p class="ledger-path">Category: testing</p>
+                </div>
+                <span></span>
+              </li>
+            </ul>
+            <p class="art-foot">One analysis produced 1 medium, 4 low and 1 info finding.</p>
+          </div>
+        </article>
+
+        <article class="exhibit" data-reveal>
+          <div class="exhibit-copy">
+            <p class="exhibit-label">Exhibit C</p>
+            <h3>The second opinion</h3>
+            <p>AI verification has a model read each checked finding against its code. It returns a verdict, a confidence score, an explanation and a suggested fix.</p>
+            <ul class="ticks">
+              <li>Verdicts: confirmed, likely, false positive or uncertain.</li>
+              <li>Use your own key for OpenAI, Anthropic, Groq, OpenRouter or any OpenAI-compatible endpoint.</li>
+              <li>Or use the platform model within your plan's limits.</li>
+            </ul>
+          </div>
+          <div class="art">
+            <div class="art-head"><span>Verify</span><span>Example: pallets/itsdangerous</span></div>
+            <div class="ledger-row">
+              <span class="chip sev sev-medium">Medium</span>
+              <p class="ledger-title">Weak hash algorithm (MD5/SHA-1)</p>
+              <span></span>
+            </div>
+            <p class="art-label">Verdict</p>
+            <div class="verdicts">
+              <span class="verdict"><span>✓</span>Confirmed</span>
+              <span class="verdict"><span>◐</span>Likely</span>
+              <span class="verdict"><span>✕</span>False positive</span>
+              <span class="verdict"><span>?</span>Uncertain</span>
+            </div>
+            <p class="art-label">Explanation</p>
+            <div class="skel w-90"></div>
+            <div class="skel w-70"></div>
+            <p class="art-label">Suggested fix</p>
+            <div class="skel w-80"></div>
+          </div>
+        </article>
+
+        <article class="exhibit is-flip" data-reveal>
+          <div class="exhibit-copy">
+            <p class="exhibit-label">Exhibit D</p>
+            <h3>The interview</h3>
+            <p>Ask questions about the node you are looking at. The chat is scoped to that node, and its answers cite the files they came from.</p>
+            <ul class="ticks">
+              <li>Scoped to the node you are viewing, so the context stays relevant.</li>
+              <li>Citations point to file paths you can open.</li>
+              <li>Questions are screened before they reach a model.</li>
+            </ul>
+          </div>
+          <div class="art">
+            <div class="art-head"><span>Chat</span><span>Example: pallets/itsdangerous</span></div>
+            <div class="chat-scope"><span class="chip">Scope</span><span class="mono">Signer.sign</span></div>
+            <p class="chat-q">Is MD5 still used for anything security-sensitive here?</p>
+            <div class="skel w-90"></div>
+            <div class="skel w-70"></div>
+            <div class="skel w-50"></div>
+            <div class="chat-cites"><span class="cite">signer.py:45</span></div>
+            <p class="art-caption">Answers cite the files they came from.</p>
+          </div>
+        </article>
+
+        <dl class="ruled">
+          <div>
+            <dt>Languages</dt>
+            <dd>Python is parsed with the standard library AST. JavaScript, TypeScript, Go, Java, Rust and Ruby are parsed with tree-sitter, with pattern matching as a fallback.</dd>
+          </div>
+          <div>
+            <dt>Model providers</dt>
+            <dd>Bring your own key for OpenAI, Anthropic, Groq, OpenRouter or any OpenAI-compatible endpoint, or use the platform model within your plan.</dd>
+          </div>
+          <div>
+            <dt>Privacy</dt>
+            <dd>Repositories, findings and chats belong to the account that created them. Code goes to a model only when you ask a chat question or verify a finding, and only that context is sent.</dd>
+          </div>
+        </dl>
       </div>
     </section>
 
     <!-- Security -->
-    <section class="section band" id="security" aria-labelledby="security-title">
-      <div class="container security-layout">
-        <div>
+    <section class="section" id="security" aria-labelledby="security-title">
+      <div class="container">
+        <div class="section-head">
           <p class="eyebrow">Security</p>
           <h2 id="security-title">Built to handle code you did not write.</h2>
           <p class="lead">Repositories are untrusted input. Sherlock treats them that way at every step, from the clone to the answer a model gives you.</p>
         </div>
-        <ul class="check-list">
-          <li><strong>Encrypted API keys.</strong> Bring-your-own keys are encrypted at rest with a server-side master key. They are decrypted only in memory when a request needs them, and are never shown again after you save them.</li>
-          <li><strong>Hashed passwords.</strong> Passwords are stored with scrypt and a per-user salt. Session tokens are random and only their hash is stored.</li>
-          <li><strong>Rate limiting.</strong> Sign-in, analysis, chat and webhook endpoints each have their own per-IP or per-account limits. Repeated failed logins lock the account for a short period.</li>
-          <li><strong>Prompt-injection defense.</strong> Questions are screened before they reach a model. Repository content is fenced as data, not instructions, before it is sent as context.</li>
-          <li><strong>Safe cloning.</strong> Only https://github.com URLs with a strict owner and repo format are accepted. Clones are shallow, run without git hooks, and are capped in size. Symlinks are not followed.</li>
-          <li><strong>Isolated repositories.</strong> Every repository, job, finding and chat session is scoped to the account that owns it.</li>
-        </ul>
+        <dl class="ledger">
+          <div class="ledger-item" data-reveal>
+            <dt>Encrypted API keys</dt>
+            <dd>Bring-your-own keys are encrypted at rest with a server-side master key. They are decrypted only in memory when a request needs them, and are never shown again after you save them.</dd>
+          </div>
+          <div class="ledger-item" data-reveal style="--i: 1">
+            <dt>Hashed passwords</dt>
+            <dd>Passwords are stored with scrypt and a per-user salt. Session tokens are random and only their hash is stored.</dd>
+          </div>
+          <div class="ledger-item" data-reveal style="--i: 2">
+            <dt>Rate limiting</dt>
+            <dd>Sign-in, analysis, chat and webhook endpoints each have their own per-IP or per-account limits. Repeated failed logins lock the account for a short period.</dd>
+          </div>
+          <div class="ledger-item" data-reveal style="--i: 3">
+            <dt>Prompt-injection defense</dt>
+            <dd>Questions are screened before they reach a model. Repository content is fenced as data, not instructions, before it is sent as context.</dd>
+          </div>
+          <div class="ledger-item" data-reveal style="--i: 4">
+            <dt>Safe cloning</dt>
+            <dd>Only https://github.com URLs with a strict owner and repo format are accepted. Clones are shallow, run without git hooks, and are capped in size. Symlinks are not followed.</dd>
+          </div>
+          <div class="ledger-item" data-reveal style="--i: 5">
+            <dt>Isolated repositories</dt>
+            <dd>Every repository, job, finding and chat session is scoped to the account that owns it.</dd>
+          </div>
+        </dl>
       </div>
     </section>
 
@@ -226,7 +410,7 @@
           <h2 id="pricing-title">Start free. Upgrade when you analyze more.</h2>
           <p>Limits apply per account. Free covers evaluation; Pro raises the monthly analysis and daily chat allowances.</p>
         </div>
-        <p class="form-status" id="pricing-status" role="status"></p>
+        <p class="help" id="pricing-status" role="status"></p>
         <div class="pricing-grid" id="pricing-grid" aria-live="polite">
           <p class="muted">Loading plans…</p>
         </div>
@@ -234,7 +418,7 @@
     </section>
 
     <!-- FAQ -->
-    <section class="section band" id="faq" aria-labelledby="faq-title">
+    <section class="section" id="faq" aria-labelledby="faq-title">
       <div class="container">
         <div class="section-head">
           <p class="eyebrow">FAQ</p>
@@ -266,6 +450,18 @@
             <p>Upgrade from Settings. Payments are handled by Stripe Checkout, and your plan updates once payment is confirmed. Plan changes and billing history are in Settings under Billing.</p>
           </details>
         </div>
+      </div>
+    </section>
+
+    <!-- Closing band -->
+    <section class="cta" aria-labelledby="cta-title">
+      <div class="container cta-inner">
+        <div>
+          <p class="eyebrow">Your first case</p>
+          <h2 id="cta-title">Bring a repository you have not read yet.</h2>
+          <p>Paste its GitHub URL into the form at the top of this page. The map is where you start.</p>
+        </div>
+        <a class="btn btn-primary btn-lg" href="#repo-url" id="cta-start">Analyze a repository</a>
       </div>
     </section>
   </main>

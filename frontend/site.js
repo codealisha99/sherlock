@@ -121,6 +121,74 @@
     return node;
   }
 
+  /* ---------- Page chrome: header rule, mobile menu, scroll reveals ---------- */
+
+  const SCROLL_RULE_PX = 4;
+
+  /** The header's bottom rule appears once the page has scrolled (passive listener). */
+  function initHeaderRule(header) {
+    function update() {
+      header.classList.toggle("is-scrolled", window.scrollY > SCROLL_RULE_PX);
+    }
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+  }
+
+  /** Disclosure menu for small screens: aria-expanded on the button; Escape or a link closes it. */
+  function initMenuToggle(header) {
+    const button = header.querySelector(".nav-toggle");
+    const panel = button && document.getElementById(button.getAttribute("aria-controls") || "");
+    if (!button || !panel) return;
+
+    function setOpen(open) {
+      header.classList.toggle("is-open", open);
+      button.setAttribute("aria-expanded", String(open));
+    }
+
+    button.addEventListener("click", function () {
+      setOpen(button.getAttribute("aria-expanded") !== "true");
+    });
+    panel.addEventListener("click", function (event) {
+      if (event.target.closest && event.target.closest("a")) setOpen(false);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && header.classList.contains("is-open")) {
+        setOpen(false);
+        button.focus();
+      }
+    });
+  }
+
+  /** Reveal [data-reveal] elements once, when they first enter the viewport. */
+  function initReveal() {
+    const nodes = document.querySelectorAll("[data-reveal]");
+    if (!("IntersectionObserver" in window)) {
+      nodes.forEach(function (node) { node.classList.add("is-revealed"); });
+      return;
+    }
+    const observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-revealed");
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.15, rootMargin: "0px 0px -6% 0px" });
+    nodes.forEach(function (node) { observer.observe(node); });
+  }
+
+  /** Adds html.js so CSS can hide reveal targets only when scripts will reveal them. */
+  function initPageChrome() {
+    document.documentElement.classList.add("js");
+    const header = document.querySelector(".site-header");
+    if (header) {
+      initHeaderRule(header);
+      initMenuToggle(header);
+    }
+    initReveal();
+  }
+
+  initPageChrome();
+
   window.Sherlock = {
     api: api,
     getMe: getMe,
