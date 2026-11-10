@@ -258,3 +258,15 @@ class TestRepositoryIndexer(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_looks_generated_detects_minified_and_bundles():
+    from app.indexer import _looks_generated
+
+    minified = ["(function(){var a=1;" + "x" * 600 + "})()"] * 3
+    normal = ["function add(a, b) {", "  return a + b;", "}"]
+    assert _looks_generated("app/static/loader.js", minified)
+    assert _looks_generated("dist/app.min.js", normal)
+    assert _looks_generated("vendor/main.bundle.js", normal)
+    assert not _looks_generated("src/add.js", normal)
+    assert not _looks_generated("src/data.py", minified)  # only JS/CSS are judged by shape

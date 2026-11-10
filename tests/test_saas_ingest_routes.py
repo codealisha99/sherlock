@@ -32,6 +32,12 @@ APP_PY = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _no_network_audit(monkeypatch):
+    """Jobs never reach OSV.dev in tests; audit-specific tests inject an auditor instead."""
+    monkeypatch.setenv("SHERLOCK_DEP_AUDIT", "false")
+
+
 @pytest.fixture()
 def store(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "index_db_path", tmp_path / "idx.db")
@@ -102,6 +108,66 @@ def test_full_job_run_produces_artifacts_and_ownership(store, owner, tmp_path):
     assert graph["repo_id"] == repo_id and graph["nodes"]
     assert findings["summary"] == result["summary"]
     assert any(f["rule_id"] == "py-eval-exec" for f in findings["findings"])
+
+
+def test_auditing_stage_merges_dependency_findings(store, owner, tmp_path, monkeypatch):
+    dep = {
+        "id": "dep1", "category": "dependency", "rule_id": "dep-vuln", "title": "requests 2.19.0 has 1 known vulnerability",
+        "severity": "high", "file_path": "requirements.txt", "line": 1, "snippet": "requests==2.19.0",
+        "description": "", "recommendation": "", "cwe": None, "node_id": "file:requirements.txt",
+        "confidence": "high", "package": "requests", "version": "2.19.0", "ecosystem": "PyPI",
+        "advisory_ids": ["GHSA-x"], "fixed_versions": ["2.20.0"], "references": [],
+    }
+    stages: List[str] = []
+    real_advance = ir._advance
+
+    def record(job_id, stage, progress, **extra):
+        stages.append((stage, progress))
+        real_advance(job_id, stage, progress, **extra)
+
+    seen: List[Any] = []
+
+    def auditor(path, files):
+        seen.append(sorted(files))
+        return [dep], {"scanned": 1, "vulnerable": 1, "ecosystems": ["PyPI"],
+                       "manifests": ["requirements.txt"], "error": None}
+
+    monkeypatch.setattr(ir, "_advance", record)
+    job = store.create_job(owner["id"], URL)
+    ir.run_job(job["id"], owner["id"], "octo", "demo", None, URL, 50, cloner=_fake_cloner(),
+               indexer=None, embed=False, repos_dir=tmp_path / "repos", audit=auditor)
+    job = store.get_job(job["id"])
+    assert job["status"] == "done"
+    progress = [p for _, p in stages]
+    assert progress == sorted(progress)
+    assert ("auditing", 82) in stages and stages.index(("scanning", 75)) < stages.index(("auditing", 82)) < stages.index(("graphing", 90))
+    assert seen and "app/main.py" in seen[0]
+    summary = job["result"]["summary"]
+    assert summary["dependencies"]["vulnerable"] == 1 and summary["by_category"]["dependency"] == 1
+    findings = json.loads((ir.analyses_dir(job["result"]["repo_id"]) / "findings.json").read_text())
+    assert any(f["id"] == "dep1" for f in findings["findings"])
+    assert findings["summary"]["dependencies"]["manifests"] == ["requirements.txt"]
+
+
+def test_audit_failure_is_warning_not_failure(store, owner, tmp_path):
+    def crashing(path, files):
+        raise RuntimeError("boom")
+
+    job = store.create_job(owner["id"], URL)
+    ir.run_job(job["id"], owner["id"], "octo", "demo", None, URL, 50, cloner=_fake_cloner(),
+               embed=False, repos_dir=tmp_path / "repos", audit=crashing)
+    job = store.get_job(job["id"])
+    assert job["status"] == "done"
+    assert job["result"]["summary"]["dependencies"]["error"] == "Dependency audit failed"
+
+
+def test_env_disables_dependency_audit(store, owner, tmp_path, monkeypatch):
+    called: List[Any] = []
+    monkeypatch.setattr(ir, "audit_dependencies", lambda *a, **k: called.append(a) or ([], {}))
+    job = _run(store, owner, _fake_cloner(), tmp=tmp_path / "repos")
+    assert called == []
+    deps = job["result"]["summary"]["dependencies"]
+    assert deps["scanned"] == 0 and deps["error"] == ir.DEP_AUDIT_DISABLED
 
 
 def test_embedding_failure_is_warning_not_failure(store, owner, tmp_path):

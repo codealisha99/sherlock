@@ -16,3 +16,6 @@ numpy==2.5.4
 sentence-transformers==6.2.0
 sqlite-vec==0.1.9
 cryptography==50.0.2
+
+tree-sitter==0.26.1
+tree-sitter-language-pack==1.25.0

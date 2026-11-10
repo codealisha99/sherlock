@@ -13,6 +13,7 @@ marked rather than presented as proven call graphs.
 
 import ast
 import fnmatch
+import re
 import hashlib
 import logging
 import math
@@ -22,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.llm.embedding_client import EmbeddingClient
+from app.llm.embedding_client import EmbeddingClient, get_default_client
 from app.storage import IndexStore
 from app.tools.filesys import SafeFilesystem
 from config import config, SherlockConfig
@@ -293,7 +294,7 @@ class RepositoryIndexer:
         RuntimeError
             If the embedding client or sqlite-vec is unavailable.
         """
-        client = embedding_client or EmbeddingClient()
+        client = embedding_client or get_default_client()
         if not client.is_available():
             raise RuntimeError(
                 "Embedding model is not available. Ensure sentence-transformers "
@@ -395,7 +396,7 @@ class RepositoryIndexer:
         if not isinstance(query, str) or not query.strip():
             raise ValueError("semantic_search() requires a nonempty query string.")
 
-        client = embedding_client or EmbeddingClient()
+        client = embedding_client or get_default_client()
         if not client.is_available():
             raise RuntimeError(
                 "Embedding model is not available. Ensure sentence-transformers "
@@ -481,7 +482,7 @@ class RepositoryIndexer:
 
             # Embed the query once for semantic search.
             query_embedding: Optional[List[float]] = None
-            client = embedding_client or EmbeddingClient()
+            client = embedding_client or get_default_client()
             if client.is_available():
                 query_embedding = client.embed_text(query)
 
@@ -548,6 +549,10 @@ class RepositoryIndexer:
             return
 
         lines = content.splitlines()
+        if _looks_generated(rel_path, lines):
+            # Minified/bundled vendor code: noise for the graph, scanner and chat.
+            result.skipped_files.append(rel_path)
+            return
         line_count = len(lines)
         language = _language_for(resolved)
         mtime = resolved.stat().st_mtime
@@ -850,6 +855,21 @@ def _utc_now() -> str:
 def _content_hash(content: str) -> str:
     import hashlib
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+_GENERATED_NAME_RE = re.compile(r"\.(min|bundle|chunk)\.(js|mjs|cjs|css)$|[-.]bundle\.js$", re.IGNORECASE)
+_MINIFIABLE_SUFFIXES = (".js", ".mjs", ".cjs", ".css")
+# Hand-written code averages ~30-50 chars/line; minified bundles run in the hundreds.
+_MINIFIED_AVG_LINE = 200
+
+
+def _looks_generated(rel_path: str, lines: List[str]) -> bool:
+    """True for minified/bundled JS/CSS that would only add noise."""
+    if _GENERATED_NAME_RE.search(rel_path):
+        return True
+    if not rel_path.lower().endswith(_MINIFIABLE_SUFFIXES) or not lines:
+        return False
+    return sum(len(line) for line in lines) / len(lines) > _MINIFIED_AVG_LINE
 
 
 def _language_for(path: Path) -> str:

@@ -1,41 +1,41 @@
 """Repository graph (files, symbols, imports, calls) built from the code index.
 
 Node ids: ``file:<path>``, ``sym:<path>::<Qualified.Name>``, ``ext:<package>``.
-Call edges are conservative: only bare-name or ``self.`` calls that resolve to
-exactly one candidate symbol are emitted.
+Python symbols come from the code index; other languages come from tree-sitter
+(``lang_parse``). Call edges are conservative: a ``self``/``this`` call resolves
+to the enclosing class's method (then its same-repo bases); other calls must
+resolve to exactly one candidate.
 """
 
 from __future__ import annotations
 
 import ast
-import posixpath
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Set, Tuple
 
-from app.saas.vuln_scanner import (
-    JS_SUFFIXES,
-    SymbolSpan,
-    read_text,
-    safe_text_path,
-    symbol_spans,
-)
+from app.saas.lang_parse import ParsedFile, parse_file
+from app.saas.lang_queries import build_index, grammar_for, resolve_import
+from app.saas.vuln_scanner import SymbolSpan, read_text, safe_text_path, symbol_spans
 from app.tools.filesys import SafeFilesystem
 
 MAX_WINDOW_LINES = 200
 WINDOW_LEAD = 5
 WARN_COMPLEXITY = 15
+MAX_BASE_HOPS = 10
 SYMBOL_KINDS = {"class": "class", "function": "function", "async_function": "function", "method": "method"}
+CALLABLE = ("function", "method")
 TYPE_PRIORITY = {"file": 0, "class": 1, "function": 1, "method": 1, "external": 2}
 SEVERITY_KEYS = ("critical", "high", "medium", "low", "info")
-JS_SPEC_RE = re.compile(
-    r"""(?:import|export)\s[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]"""
-    r"""|\bimport\s*['"]([^'"]+)['"]"""
-    r"""|\brequire\(\s*['"]([^'"]+)['"]\s*\)"""
-    r"""|\bimport\(\s*['"]([^'"]+)['"]\s*\)"""
-)
+_IDENT_RE = re.compile(r"^[A-Za-z_]\w*$")
 Edge = Tuple[str, str, str]
+
+
+class _Ctx(NamedTuple):
+    sym_nodes: Dict[str, Dict[str, Any]]
+    bases: Dict[str, List[str]]  # Python class node id -> base class names
+    by_class: Dict[str, List[str]]  # Python class name -> class node ids
 
 
 def _counts(items: Iterable[Dict[str, Any]]) -> Dict[str, int]:
@@ -54,6 +54,43 @@ def _health(counts: Dict[str, int], complexity: int) -> str:
     return "good"
 
 
+def _fallback_metrics(node: Dict[str, Any], file_loc: int) -> Dict[str, Any]:
+    """Metrics when quality analysis has none (non-Python symbols, externals).
+
+    Complexity is omitted rather than reported as 0 when it was never measured.
+    """
+    if node["type"] == "file":
+        return {"loc": file_loc, "complexity": 0}
+    line, end = node.get("line") or 0, node.get("end_line") or 0
+    return {"loc": end - line + 1} if line and end >= line else {}
+
+
+def _counted(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Findings that should colour the graph: AI-dismissed ones are excluded."""
+    return [f for f in findings if (f.get("triage") or {}).get("verdict") != "false_positive"]
+
+
+def refresh_finding_counts(graph: Dict[str, Any], findings: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return a copy of the graph with per-node counts/health recomputed from findings.
+
+    Used at read time so triage verdicts show up without rebuilding the graph.
+    """
+    by_node: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    by_file: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for f in _counted(findings):
+        if f.get("node_id"):
+            by_node[f["node_id"]].append(f)
+        if f.get("file_path"):
+            by_file[f["file_path"]].append(f)
+    nodes = []
+    for node in graph.get("nodes", []):
+        hits = by_file[node.get("file_path") or ""] if node.get("type") == "file" else by_node[node["id"]]
+        counts = _counts(hits)
+        complexity = (node.get("metrics") or {}).get("complexity", 0)
+        nodes.append({**node, "findings": counts, "health": _health(counts, complexity)})
+    return {**graph, "nodes": nodes}
+
+
 def _read_rel(root: Path, rel: str) -> str:
     path = safe_text_path(root, rel)
     return (read_text(path) if path is not None else None) or ""
@@ -62,23 +99,6 @@ def _read_rel(root: Path, rel: str) -> str:
 def _resolve_python(module: str, paths: Set[str]) -> Optional[str]:
     base = module.replace(".", "/")
     return next((c for c in (f"{base}.py", f"{base}/__init__.py") if c in paths), None)
-
-
-def _resolve_js(rel: str, spec: str, paths: Set[str]) -> Optional[str]:
-    base = posixpath.normpath(posixpath.join(posixpath.dirname(rel), spec))
-    if base == ".." or base.startswith("../"):
-        return None
-    candidates = [base, *(base + e for e in JS_SUFFIXES), *(f"{base}/index{e}" for e in JS_SUFFIXES)]
-    return next((c for c in candidates if c in paths), None)
-
-
-def _package_name(spec: str) -> str:
-    parts = spec.split("/")
-    return "/".join(parts[:2]) if spec.startswith("@") else parts[0]
-
-
-def _js_specs(text: str) -> List[str]:
-    return [next(g for g in m.groups() if g) for m in JS_SPEC_RE.finditer(text)]
 
 
 def _symbol_nodes(defs: List[Dict[str, Any]], path_of: Dict[int, str], lang: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
@@ -94,12 +114,32 @@ def _symbol_nodes(defs: List[Dict[str, Any]], path_of: Dict[int, str], lang: Dic
     return nodes
 
 
+def _lang_symbol_nodes(parsed: Dict[str, ParsedFile], lang: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
+    nodes: Dict[str, Dict[str, Any]] = {}
+    for path, pf in parsed.items():
+        for s in pf.symbols:
+            nid = f"sym:{path}::{s.qualname}"
+            nodes[nid] = {"id": nid, "type": s.kind, "label": s.qualname, "file_path": path,
+                          "line": s.line, "end_line": s.end_line, "language": lang.get(path)}
+    return nodes
+
+
 def _file_nodes(files: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     return {
         f"file:{f['path']}": {"id": f"file:{f['path']}", "type": "file", "label": Path(f["path"]).name,
                               "file_path": f["path"], "line": 1, "language": f["language"]}
         for f in files
     }
+
+
+def _parse_sources(root: Path, files: List[Dict[str, Any]]) -> Dict[str, ParsedFile]:
+    out: Dict[str, ParsedFile] = {}
+    for f in files:
+        path = f["path"]
+        if path.endswith(".py") or grammar_for(path) is None:
+            continue
+        out[path] = parse_file(path, _read_rel(root, path), f["language"])
+    return out
 
 
 def _python_spans(root: Path, files: List[Dict[str, Any]]) -> Dict[str, List[SymbolSpan]]:
@@ -125,39 +165,120 @@ def _callee_expr(evidence: str) -> str:
     return evidence[: -len("(...)")] if evidence.endswith("(...)") else evidence
 
 
-def _call_edges(
-    refs: List[Dict[str, Any]], sym_nodes: Dict[str, Dict[str, Any]], spans: Dict[str, List[SymbolSpan]]
-) -> Set[Edge]:
-    by_name: Dict[str, List[str]] = defaultdict(list)
+def _class_bases(defs: List[Dict[str, Any]], path_of: Dict[int, str]) -> Dict[str, List[str]]:
+    """Python base names from the class signature '(A, mod.B, metaclass=M)'; keyword args dropped."""
+    out: Dict[str, List[str]] = {}
+    for d in defs:
+        path = path_of.get(d["file_id"])
+        if d["kind"] != "class" or path is None or not d.get("signature"):
+            continue
+        names = [b.strip().split(".")[-1] for b in d["signature"].strip("()").split(",")]
+        out[f"sym:{path}::{d['name']}"] = [n for n in names if _IDENT_RE.match(n)]
+    return out
+
+
+def _by_class(sym_nodes: Dict[str, Dict[str, Any]]) -> Dict[str, List[str]]:
+    out: Dict[str, List[str]] = defaultdict(list)
     for nid, node in sym_nodes.items():
-        if node["type"] in ("function", "method"):
+        if node["type"] == "class" and node["file_path"].endswith(".py"):
+            out[node["label"].split(".")[-1]].append(nid)
+    return out
+
+
+def _find_base(name: str, path: str, ctx: _Ctx) -> Optional[str]:
+    local = f"sym:{path}::{name}"
+    if ctx.sym_nodes.get(local, {}).get("type") == "class":
+        return local
+    hits = ctx.by_class.get(name, [])
+    return hits[0] if len(hits) == 1 else None
+
+
+def _self_target(caller: str, name: str, ctx: _Ctx) -> Optional[str]:
+    """Method `name` on the caller's enclosing class, then its same-repo bases (breadth-first)."""
+    path, qual = caller[len("sym:"):].split("::", 1)
+    if "." not in qual:
+        return None
+    queue = [f"sym:{path}::{qual.rsplit('.', 1)[0]}"]
+    seen: Set[str] = set()
+    while queue and len(seen) < MAX_BASE_HOPS:
+        cls = queue.pop(0)
+        if cls in seen:
+            continue
+        seen.add(cls)
+        cand = f"{cls}.{name}"
+        if ctx.sym_nodes.get(cand, {}).get("type") in CALLABLE:
+            return cand
+        queue.extend(b for b in (_find_base(n, path, ctx) for n in ctx.bases.get(cls, [])) if b)
+    return None
+
+
+def _call_edges(refs: List[Dict[str, Any]], ctx: _Ctx, spans: Dict[str, List[SymbolSpan]]) -> Set[Edge]:
+    by_name: Dict[str, List[str]] = defaultdict(list)
+    for nid, node in ctx.sym_nodes.items():
+        if node["type"] in CALLABLE and node["file_path"].endswith(".py"):
             by_name[node["label"].split(".")[-1]].append(nid)
     edges: Set[Edge] = set()
     for ref in refs:
         callee_expr = _callee_expr(ref.get("evidence_detail") or "")
+        caller = _caller_id(ref["file_path"], ref["line"], spans)
+        if caller and callee_expr.startswith("self."):
+            target = _self_target(caller, ref["symbol_name"], ctx)
+            if target:
+                if target != caller:
+                    edges.add((caller, target, "calls"))
+                continue
         if "." in callee_expr and not callee_expr.startswith("self."):
             continue
-        caller = _caller_id(ref["file_path"], ref["line"], spans)
         cands = by_name.get(ref["symbol_name"], [])
-        same_file = [c for c in cands if sym_nodes[c]["file_path"] == ref["file_path"]]
+        same_file = [c for c in cands if ctx.sym_nodes[c]["file_path"] == ref["file_path"]]
         target = same_file[0] if len(same_file) == 1 else (cands[0] if len(cands) == 1 else None)
         if caller and target and caller != target:
             edges.add((caller, target, "calls"))
     return edges
 
 
-def _import_edges(
-    root: Path, files: List[Dict[str, Any]], imports: List[Dict[str, Any]], paths: Set[str]
-) -> Tuple[Set[Edge], Dict[str, Dict[str, Any]]]:
+def _unique_callee(path: str, name: str, by_name: Dict[str, List[str]], ctx: _Ctx, imported: Set[str]) -> Optional[str]:
+    """Same file (must be unique), then same imported file, then unique in repo."""
+    cands = by_name.get(name, [])
+    same = [c for c in cands if ctx.sym_nodes[c]["file_path"] == path]
+    if same:
+        return same[0] if len(same) == 1 else None
+    via = [c for c in cands if ctx.sym_nodes[c]["file_path"] in imported]
+    if via:
+        return via[0] if len(via) == 1 else None
+    return cands[0] if len(cands) == 1 else None
+
+
+def _lang_call_edges(parsed: Dict[str, ParsedFile], ctx: _Ctx, targets: Dict[str, Set[str]]) -> Set[Edge]:
+    by_name: Dict[str, List[str]] = defaultdict(list)
+    for nid, node in ctx.sym_nodes.items():
+        if node["type"] in CALLABLE and node["file_path"] in parsed:
+            by_name[node["label"].split(".")[-1]].append(nid)
+    edges: Set[Edge] = set()
+    for path, pf in parsed.items():
+        for call in pf.calls:
+            if call.caller_qualname is None:
+                continue
+            caller = f"sym:{path}::{call.caller_qualname}"
+            if caller not in ctx.sym_nodes:
+                continue
+            target = _self_target(caller, call.callee_name, ctx) if call.is_self else None
+            target = target or _unique_callee(path, call.callee_name, by_name, ctx, targets.get(path, set()))
+            if target and target != caller:
+                edges.add((caller, target, "calls"))
+    return edges
+
+
+def _add_external(pkg: str, src_file: str, edges: Set[Edge], externals: Dict[str, Dict[str, Any]]) -> None:
+    nid = f"ext:{pkg}"
+    externals.setdefault(nid, {"id": nid, "type": "external", "label": pkg,
+                               "file_path": None, "line": 0, "language": None})
+    edges.add((f"file:{src_file}", nid, "imports"))
+
+
+def _python_import_edges(imports: List[Dict[str, Any]], paths: Set[str]) -> Tuple[Set[Edge], Dict[str, Dict[str, Any]]]:
     edges: Set[Edge] = set()
     externals: Dict[str, Dict[str, Any]] = {}
-
-    def add_ext(pkg: str, src_file: str) -> None:
-        nid = f"ext:{pkg}"
-        externals.setdefault(nid, {"id": nid, "type": "external", "label": pkg,
-                                   "file_path": None, "line": 0, "language": None})
-        edges.add((f"file:{src_file}", nid, "imports"))
-
     for imp in imports:
         module = imp["module"]
         if not module:
@@ -166,19 +287,26 @@ def _import_edges(
         if target:
             edges.add((f"file:{imp['file_path']}", f"file:{target}", "imports"))
         else:
-            add_ext(module.split(".")[0], imp["file_path"])
-
-    for f in files:
-        if not f["path"].endswith(JS_SUFFIXES):
-            continue
-        for spec in _js_specs(_read_rel(root, f["path"])):
-            if spec.startswith(("./", "../")):
-                target = _resolve_js(f["path"], spec, paths)
-                if target:
-                    edges.add((f"file:{f['path']}", f"file:{target}", "imports"))
-            elif spec and not spec.startswith("/"):
-                add_ext(_package_name(spec), f["path"])
+            _add_external(module.split(".")[0], imp["file_path"], edges, externals)
     return edges, externals
+
+
+def _lang_import_edges(
+    parsed: Dict[str, ParsedFile], idx: Any
+) -> Tuple[Set[Edge], Dict[str, Dict[str, Any]], Dict[str, Set[str]]]:
+    edges: Set[Edge] = set()
+    externals: Dict[str, Dict[str, Any]] = {}
+    targets: Dict[str, Set[str]] = defaultdict(set)
+    for path, pf in parsed.items():
+        for imp in pf.imports:
+            internal, pkg = resolve_import(grammar_for(path) or "", path, imp.module_spec, idx)
+            for target in internal:
+                if target != path:
+                    edges.add((f"file:{path}", f"file:{target}", "imports"))
+                    targets[path].add(target)
+            if pkg:
+                _add_external(pkg, path, edges, externals)
+    return edges, externals, targets
 
 
 def build_graph(
@@ -195,26 +323,31 @@ def build_graph(
     lang = {f["path"]: f["language"] for f in files}
     path_of = {f["id"]: f["path"] for f in files}
     base = Path(root).resolve()
+    defs = store.get_definitions_by_repo(repo_id)
 
     nodes: Dict[str, Dict[str, Any]] = _file_nodes(files)
-    sym_nodes = _symbol_nodes(store.get_definitions_by_repo(repo_id), path_of, lang)
+    sym_nodes = _symbol_nodes(defs, path_of, lang)
+    parsed = _parse_sources(base, files)
+    sym_nodes.update(_lang_symbol_nodes(parsed, lang))
     nodes.update(sym_nodes)
 
     edges: Set[Edge] = set()
     for nid in sym_nodes:
         path, qual = nid[len("sym:"):].split("::", 1)
-        parent = f"sym:{path}::{qual.split('.')[0]}"
-        if "." in qual and parent in sym_nodes:
-            edges.add((parent, nid, "contains"))
-        else:
-            edges.add((f"file:{path}", nid, "contains"))
+        parent = f"sym:{path}::{qual.rsplit('.', 1)[0]}" if "." in qual else None
+        edges.add((parent, nid, "contains") if parent in sym_nodes else (f"file:{path}", nid, "contains"))
 
-    imp_edges, externals = _import_edges(base, files, store.get_imports_by_repo(repo_id), paths)
-    nodes.update(externals)
-    edges |= imp_edges
+    idx = build_index(paths, _read_rel(base, "go.mod") if "go.mod" in paths else "")
+    py_edges, py_ext = _python_import_edges(store.get_imports_by_repo(repo_id), paths)
+    lang_edges, lang_ext, targets = _lang_import_edges(parsed, idx)
+    nodes.update(py_ext)
+    nodes.update(lang_ext)
+    edges |= py_edges | lang_edges
 
+    ctx = _Ctx(sym_nodes, _class_bases(defs, path_of), _by_class(sym_nodes))
     spans = _python_spans(base, files)
-    edges |= _call_edges(store.get_symbol_references(repo_id), sym_nodes, spans)
+    edges |= _call_edges(store.get_symbol_references(repo_id), ctx, spans)
+    edges |= _lang_call_edges(parsed, ctx, targets)
 
     return _assemble(repo_id, nodes, edges, findings, metrics, files, max_nodes)
 
@@ -236,9 +369,9 @@ def _assemble(
 
     by_node: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     by_file: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-    for f in findings:
-        by_node[f["node_id"]].append(f)
-        by_file[f["file_path"]].append(f)
+    for f in _counted(findings):
+        by_node[f.get("node_id")].append(f)
+        by_file[f.get("file_path")].append(f)
     line_counts = {f["path"]: f["line_count"] for f in files}
 
     built: List[Dict[str, Any]] = []
@@ -246,7 +379,7 @@ def _assemble(
         is_file = node["type"] == "file"
         counts = _counts(by_file[node["file_path"]] if is_file else by_node[nid])
         default_loc = line_counts.get(node["file_path"] or "", 0) if is_file else 0
-        m = dict(metrics.get(nid) or {"loc": default_loc, "complexity": 0})
+        m = dict(metrics.get(nid) or _fallback_metrics(node, default_loc))
         built.append({**node, "metrics": m, "findings": counts,
                       "health": _health(counts, m.get("complexity", 0))})
 
@@ -291,13 +424,22 @@ def _neighbour(nodes: Dict[str, Dict[str, Any]], other_id: str, edge: Dict[str, 
             "edge": edge["type"]}
 
 
+def _window_bounds(node: Dict[str, Any]) -> Tuple[int, int]:
+    """Symbols with end_line: exactly line..end_line (capped). Others: lead-in context around line."""
+    line = max(1, int(node.get("line") or 1))
+    if node.get("end_line"):
+        return line, min(max(line, int(node["end_line"])), line + MAX_WINDOW_LINES - 1)
+    start = max(1, line - WINDOW_LEAD)
+    return start, start + MAX_WINDOW_LINES - 1
+
+
 def _source_window(root: Path, node: Dict[str, Any]) -> Dict[str, Any]:
     empty = {"path": node.get("file_path"), "start_line": 0, "end_line": 0, "lines": []}
     if not node.get("file_path"):
         return empty
-    start = max(1, int(node.get("line") or 1) - WINDOW_LEAD)
+    start, end = _window_bounds(node)
     try:
-        lines = SafeFilesystem(root).read_file_lines(node["file_path"], start, start + MAX_WINDOW_LINES - 1)
+        lines = SafeFilesystem(root).read_file_lines(node["file_path"], start, end)
     except ValueError:
         return empty
     return {

@@ -1,7 +1,8 @@
 """SaaS repo-ingest routes and the background analysis job runner.
 
 Stages: queued -> cloning(10) -> indexing(35) -> embedding(55) -> scanning(75)
--> graphing(90) -> done(100). Embedding failure is a warning, not a job failure.
+-> auditing(82) -> graphing(90) -> done(100). Embedding and dependency-audit failures
+are warnings, not job failures. SHERLOCK_DEP_AUDIT=false disables the network audit.
 Artifacts live at <workspace_dir>/analyses/<repo_id>/{findings.json,graph.json}.
 """
 
@@ -16,12 +17,13 @@ import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from app.indexer import RepositoryIndexer
 from app.saas.db import get_store
+from app.saas.dep_audit import audit_dependencies, empty_summary
 from app.saas.github_ingest import CloneError, clone_repo, parse_github_url, repos_root
-from app.saas.graph import build_graph, node_detail
+from app.saas.graph import refresh_finding_counts, build_graph, node_detail
 from app.saas.http import HTTPError, Request, Response
 from app.saas.plans import EVENT_ANALYSIS, plan_limits
 from app.saas.quality import analyze_quality, summarize
@@ -36,6 +38,9 @@ MAX_GRAPH_NODES = 1500
 REPO_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 GENERIC_FAILURE = "Analysis failed. Please try again, or try a smaller repository."
 Cloner = Callable[[str, str, Optional[str], Path, int], Path]
+# (repo_root, scannable_files) -> (dependency findings, summary["dependencies"])
+Auditor = Callable[[Path, List[str]], Tuple[List[Dict[str, Any]], Dict[str, Any]]]
+DEP_AUDIT_DISABLED = "Dependency audit disabled by SHERLOCK_DEP_AUDIT"
 
 _quota_lock = threading.Lock()
 _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="sherlock-ingest")
@@ -89,9 +94,26 @@ def _unique(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return list({f["id"]: f for f in findings}.values())
 
 
+def _dep_audit_enabled() -> bool:
+    return os.environ.get("SHERLOCK_DEP_AUDIT", "true").strip().lower() not in ("false", "0", "no", "off")
+
+
+def _run_audit(path: Path, files: List[str], audit: Optional[Auditor]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Dependency stage. Never raises: an auditor failure is recorded in the summary."""
+    if audit is None:
+        if not _dep_audit_enabled():
+            return [], empty_summary(DEP_AUDIT_DISABLED)
+        audit = audit_dependencies
+    try:
+        return audit(path, files)
+    except Exception:
+        logger.exception("Dependency audit crashed for %s", path)
+        return [], empty_summary("Dependency audit failed")
+
+
 def _run_stages(
     job_id: str, user_id: str, owner: str, repo: str, branch: Optional[str], url: str, max_mb: int,
-    cloner: Cloner, indexer: RepositoryIndexer, embed: bool, repos_dir: Path,
+    cloner: Cloner, indexer: RepositoryIndexer, embed: bool, repos_dir: Path, audit: Optional[Auditor],
 ) -> Dict[str, Any]:
     store = get_store()
     _advance(job_id, "cloning", 10)
@@ -110,8 +132,12 @@ def _run_stages(
     _advance(job_id, "scanning", 75)
     files = _scannable_files(indexer.store, repo_id)
     quality_findings, metrics = analyze_quality(path, files)
-    findings = _unique([*scan_repository(path, files), *quality_findings])
-    summary = summarize(findings)
+    scan_findings = scan_repository(path, files)
+
+    _advance(job_id, "auditing", 82)
+    dep_findings, dep_summary = _run_audit(path, files, audit)
+    findings = _unique([*scan_findings, *quality_findings, *dep_findings])
+    summary = {**summarize(findings), "dependencies": dep_summary}
 
     _advance(job_id, "graphing", 90)
     graph = build_graph(repo_id, indexer.store, path, findings, metrics, MAX_GRAPH_NODES)
@@ -146,13 +172,17 @@ def run_job(
     indexer: Optional[RepositoryIndexer] = None,
     embed: bool = True,
     repos_dir: Optional[Path] = None,
+    audit: Optional[Auditor] = None,
 ) -> None:
-    """Run one analysis synchronously. Never raises: failures are recorded on the job."""
+    """Run one analysis synchronously. Never raises: failures are recorded on the job.
+
+    audit=None uses audit_dependencies (unless SHERLOCK_DEP_AUDIT=false). Tests inject a fake.
+    """
     store = get_store()
     try:
         _run_stages(
             job_id, user_id, owner, repo, branch, url, max_mb, cloner,
-            indexer or RepositoryIndexer(), embed, repos_dir or repos_root(),
+            indexer or RepositoryIndexer(), embed, repos_dir or repos_root(), audit,
         )
     except Exception as exc:
         logger.exception("Ingest job %s failed", job_id)
@@ -259,7 +289,10 @@ def _repo_root(repo_id: str) -> Path:
 
 
 def get_graph(req: Request) -> Response:
-    return Response(body=_read_artifact(_owned_repo_id(req), "graph.json"))
+    repo_id = _owned_repo_id(req)
+    graph = _read_artifact(repo_id, "graph.json")
+    findings = _read_artifact(repo_id, "findings.json").get("findings", [])
+    return Response(body=refresh_finding_counts(graph, findings))
 
 
 def get_findings(req: Request) -> Response:

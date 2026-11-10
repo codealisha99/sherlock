@@ -25,6 +25,19 @@ MAX_SCAN_BYTES = 512 * 1024
 JS_SUFFIXES = (".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs")
 TEST_PATH_RE = re.compile(r"(^|/)(tests?|__tests__)/|(^|/)test_[^/]*$|_test\.[a-z]+$|\.(test|spec)\.[a-z]+$")
 _DOWNGRADE = {"critical": "high", "high": "medium", "medium": "low", "low": "info", "info": "info"}
+# Confidence that a finding is a real issue. Only medium+ findings count toward the score.
+# Unlisted rules default to medium. Heuristic rules with high false-positive rates are low.
+CONFIDENCE: Dict[str, str] = {
+    "py-subprocess-string": "medium", "py-sql-string": "medium", "py-weak-hash": "medium",
+    "py-insecure-random": "medium", "py-debug-true": "medium", "py-bare-except": "medium",
+    "py-xml-untrusted": "low", "py-bind-all": "low", "py-assert-auth": "low",
+    "secret-generic": "medium", "js-dom-html": "medium", "js-react-html": "medium",
+    "js-local-token": "medium", "js-http-url": "low",
+    "dep-unpinned-python": "low", "dep-floating-npm": "low",
+    "q-complexity": "medium", "q-nesting": "medium", "q-file-very-large": "medium",
+    "q-function-length": "low", "q-file-large": "low", "q-todo": "low",
+    "q-docstring": "low", "q-no-tests": "low",
+}
 
 
 class Meta(NamedTuple):
@@ -160,6 +173,7 @@ def make_finding(
         "recommendation": meta.recommendation,
         "cwe": meta.cwe,
         "node_id": node_id or f"file:{file_path}",
+        "confidence": CONFIDENCE.get(rule_id, "medium"),
     }
 
 
@@ -495,8 +509,11 @@ def _package_findings(rel: str, text: str) -> List[Dict[str, Any]]:
 
 
 # ------------------------------------------------------------------ orchestration
-def _downgrade(finding: Dict[str, Any]) -> Dict[str, Any]:
-    return {**finding, "severity": _DOWNGRADE[finding["severity"]]}
+def _test_fixture(finding: Dict[str, Any]) -> Dict[str, Any]:
+    """Findings in test code are usually fixtures: lower severity and confidence."""
+    if finding["category"] not in ("security", "secrets"):
+        return finding
+    return {**finding, "severity": _DOWNGRADE[finding["severity"]], "confidence": "low"}
 
 
 def scan_file(base: Path, rel: str) -> List[Dict[str, Any]]:
@@ -517,7 +534,7 @@ def scan_file(base: Path, rel: str) -> List[Dict[str, Any]]:
     out.extend(_secret_findings(rel, text, lines, spans))
     out.extend(_dependency_findings(rel, path.name, text))  # type: ignore[union-attr]
     if is_test:
-        out = [_downgrade(f) if f["category"] in ("security", "secrets") else f for f in out]
+        out = [_test_fixture(f) for f in out]
     return out
 
 

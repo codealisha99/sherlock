@@ -164,3 +164,15 @@ def test_path_escape_is_rejected(tmp_path):
     (tmp_path / "repo").mkdir()
     (tmp_path / "secret.py").write_text("x = eval(s)\n")
     assert scan_repository(tmp_path / "repo", ["../secret.py"]) == []
+
+
+def test_every_finding_carries_confidence(tmp_path):
+    findings = _scan(tmp_path, {"app/a.py": "x = eval(s)\nimport random\nt = random.choice(a)\n"})
+    assert findings and all(f["confidence"] in ("high", "medium", "low") for f in findings)
+    assert [f for f in findings if f["rule_id"] == "py-eval-exec"][0]["confidence"] == "medium"
+
+
+def test_test_fixture_secrets_are_low_confidence(tmp_path):
+    findings = _scan(tmp_path, {"tests/test_fixture.py": "KEY = 'AKIAABCDEFGHIJKLMNOP'\n"})
+    key = [f for f in findings if f["rule_id"] == "secret-aws-key"][0]
+    assert key["confidence"] == "low" and key["severity"] == "high"

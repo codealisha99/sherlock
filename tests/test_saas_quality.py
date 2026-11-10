@@ -71,8 +71,12 @@ def test_quality_findings_and_metrics(tmp_path):
 
     assert ("q-complexity", "sym:app/mod.py::busy") in rules
     assert ("q-function-length", "sym:app/mod.py::long_one") in rules
-    assert ("q-docstring", "sym:app/mod.py::undocumented") in rules
-    assert not any(r == "q-docstring" and "_private" in n for r, n in rules)
+    docs = [f for f in findings if f["rule_id"] == "q-docstring"]
+    assert len(docs) == 1 and docs[0]["file_path"] == "app/mod.py"
+    assert docs[0]["count"] == 3 and docs[0]["severity"] == "info"
+    undocumented_line = src.splitlines().index("def undocumented():") + 1
+    assert {"file_path": "app/mod.py", "line": undocumented_line} in docs[0]["occurrences"]
+    assert all("_private" not in str(o) for o in docs[0]["occurrences"])
     assert any(r == "q-todo" for r, _ in rules)
     assert metrics["sym:app/mod.py::busy"]["complexity"] > 10
     assert metrics["file:app/mod.py"]["loc"] == len((tmp_path / "app/mod.py").read_text().splitlines())
@@ -82,11 +86,43 @@ def test_untested_module_flagged_until_test_exists(tmp_path):
     body = "\n".join(f"x{i} = {i}" for i in range(40)) + "\n"
     _write(tmp_path, "app/billing_engine.py", body)
     findings, _ = analyze_quality(tmp_path, ["app/billing_engine.py"])
-    assert any(f["rule_id"] == "q-no-tests" for f in findings)
+    untested = [f for f in findings if f["rule_id"] == "q-no-tests"]
+    assert len(untested) == 1
+    assert untested[0]["file_path"] == "" and untested[0]["node_id"] is None
+    assert untested[0]["occurrences"] == [{"file_path": "app/billing_engine.py", "line": 1}]
+    assert untested[0]["confidence"] == "low"
 
     _write(tmp_path, "tests/test_billing_engine.py", "def test_x():\n    pass\n")
     findings, _ = analyze_quality(tmp_path, ["app/billing_engine.py", "tests/test_billing_engine.py"])
     assert not any(f["rule_id"] == "q-no-tests" for f in findings)
+
+
+def test_many_untested_modules_aggregate_into_one_finding(tmp_path):
+    files = []
+    for name in ("alpha_service", "beta_service", "gamma_service"):
+        _write(tmp_path, f"app/{name}.py", "\n".join(f"x{i} = {i}" for i in range(40)) + "\n")
+        files.append(f"app/{name}.py")
+    findings, _ = analyze_quality(tmp_path, files)
+    untested = [f for f in findings if f["rule_id"] == "q-no-tests"]
+    assert len(untested) == 1 and untested[0]["count"] == 3
+    assert {o["file_path"] for o in untested[0]["occurrences"]} == set(files)
+
+
+def test_docstring_findings_one_per_file(tmp_path):
+    body = "".join(f"def api_{i}():\n    return {i}\n\n" for i in range(10))
+    _write(tmp_path, "app/many.py", body)
+    _write(tmp_path, "app/clean.py", '"""Doc."""\n\ndef ok():\n    """Doc."""\n    return 1\n')
+    findings, _ = analyze_quality(tmp_path, ["app/many.py", "app/clean.py"])
+    docs = [f for f in findings if f["rule_id"] == "q-docstring"]
+    assert len(docs) == 1
+    assert docs[0]["count"] == 10 and len(docs[0]["occurrences"]) == 10
+
+
+def test_todo_only_counts_comment_markers(tmp_path):
+    text = 'def f():\n    """Lists TODO FIXME HACK markers."""\n    return 1\n'
+    _write(tmp_path, "app/doc_only.py", text)
+    findings, _ = analyze_quality(tmp_path, ["app/doc_only.py"])
+    assert not any(f["rule_id"] == "q-todo" for f in findings)
 
 
 def test_small_modules_not_flagged_as_untested(tmp_path):
@@ -117,6 +153,19 @@ def test_summarize_score_and_counts():
     assert result["by_severity"]["critical"] == 1
     assert result["by_category"] == {"quality": 1, "secrets": 1, "security": 1}
     assert result["total"] == 3
+
+
+def test_low_confidence_and_false_positives_do_not_lower_score():
+    real = {"severity": "high", "category": "security", "confidence": "high"}
+    noisy = {"severity": "high", "category": "security", "confidence": "low"}
+    fp = {"severity": "high", "category": "security", "confidence": "high",
+          "triage": {"verdict": "false_positive"}}
+    confirmed = {"severity": "high", "category": "security", "confidence": "high",
+                 "triage": {"verdict": "confirmed"}}
+    result = summarize([real, noisy, fp, confirmed])
+    assert result["score"] == 100 - 2 * 3  # only the two non-FP medium+ findings count
+    assert result["total"] == 4
+    assert result["triaged"] == 2 and result["false_positives"] == 1
 
 
 def test_summarize_clamps_at_zero():

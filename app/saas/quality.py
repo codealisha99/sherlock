@@ -33,7 +33,7 @@ FILE_LOC_VERY_LARGE = 1500
 TODO_MIN_COUNT = 3
 UNTESTED_MIN_LOC = 30
 MIN_MODULE_STEM = 4
-TODO_RE = re.compile(r"\b(?:TODO|FIXME|HACK)\b")
+TODO_RE = re.compile(r"(?:#|//|/\*|\*|<!--)\s*(?:TODO|FIXME|HACK)\b")  # comment markers only
 PENALTY = {"critical": 10.0, "high": 3.0, "medium": 1.0, "low": 0.1, "info": 0.0}
 
 QUALITY_META: Dict[str, Meta] = {
@@ -145,14 +145,23 @@ def _python_quality(rel: str, text: str) -> Tuple[List[Dict[str, Any]], Dict[str
 
 
 def _docstring_findings(rel: str, tree: ast.Module, lines: List[str]) -> List[Dict[str, Any]]:
-    out: List[Dict[str, Any]] = []
-    for node in tree.body:
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            continue
-        if node.name.startswith("_") or ast.get_docstring(node) is not None:
-            continue
-        out.append(_q("q-docstring", rel, node.lineno, _line_text(lines, node.lineno), f"sym:{rel}::{node.name}"))
-    return out
+    """At most one aggregated q-docstring finding per file."""
+    missing = [
+        node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        and not node.name.startswith("_") and ast.get_docstring(node) is None
+    ]
+    if not missing:
+        return []
+    first = missing[0].lineno
+    occurrences = [{"file_path": rel, "line": node.lineno} for node in missing]
+    return [_aggregate("q-docstring", rel, first, _line_text(lines, first), None, occurrences)]
+
+
+def _aggregate(
+    rule: str, rel: str, line: int, src: str, node_id: Optional[str], occurrences: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    return {**_q(rule, rel, line, src, node_id), "count": len(occurrences), "occurrences": occurrences}
 
 
 def _q(rule: str, rel: str, line: int, src: str, node_id: Optional[str], severity: Optional[str] = None) -> Dict[str, Any]:
@@ -188,7 +197,17 @@ def _test_stem(rel: str) -> str:
 
 
 def untested_module_findings(files: List[str], loc_by_file: Dict[str, int]) -> List[Dict[str, Any]]:
-    """Flag sizeable source modules whose name appears in no test file name."""
+    """One repo-level q-no-tests finding listing sizeable modules whose name appears in no test file name.
+
+    Repo-level findings carry file_path "" and node_id None (no single graph node owns them).
+    """
+    occurrences = _untested_occurrences(files, loc_by_file)
+    if not occurrences:
+        return []
+    return [{**_aggregate("q-no-tests", "", 0, "", None, occurrences), "node_id": None}]
+
+
+def _untested_occurrences(files: List[str], loc_by_file: Dict[str, int]) -> List[Dict[str, Any]]:
     test_stems = [_test_stem(f) for f in files if is_test_path(f)]
     out: List[Dict[str, Any]] = []
     for rel in files:
@@ -202,7 +221,7 @@ def untested_module_findings(files: List[str], loc_by_file: Dict[str, int]) -> L
             continue
         if any(stem in t for t in test_stems):
             continue
-        out.append(_q("q-no-tests", rel, 1, name, None))
+        out.append({"file_path": rel, "line": 1})
     return out
 
 
@@ -231,15 +250,29 @@ def analyze_quality(root: Path, files: Iterable[str]) -> Tuple[List[Dict[str, An
     return findings, metrics
 
 
+def is_scored(finding: Dict[str, Any]) -> bool:
+    """Low-confidence findings and AI-triaged false positives do not lower the score."""
+    if finding.get("confidence", "medium") == "low":
+        return False
+    return (finding.get("triage") or {}).get("verdict") != "false_positive"
+
+
 def summarize(findings: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
-    """Score 0-100 (100 = no weighted penalty) plus severity/category counts."""
+    """Score 0-100 (100 = no weighted penalty) plus severity/category counts.
+
+    Counts cover every finding; only is_scored() findings contribute to the score.
+    """
     items = list(findings)
     by_sev = Counter(f["severity"] for f in items)
     by_cat = Counter(f["category"] for f in items)
-    penalty = sum(PENALTY.get(sev, 0.0) * n for sev, n in by_sev.items())
+    penalty = sum(PENALTY.get(f["severity"], 0.0) for f in items if is_scored(f))
+    triaged = sum(1 for f in items if f.get("triage"))
+    false_positives = sum(1 for f in items if (f.get("triage") or {}).get("verdict") == "false_positive")
     return {
         "score": int(max(0, min(100, round(100 - penalty)))),
         "by_severity": {sev: by_sev.get(sev, 0) for sev in SEVERITIES},
         "by_category": dict(sorted(by_cat.items())),
         "total": len(items),
+        "triaged": triaged,
+        "false_positives": false_positives,
     }
