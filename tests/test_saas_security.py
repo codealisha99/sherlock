@@ -106,7 +106,7 @@ def test_dev_key_generated_with_0600_when_env_unset(monkeypatch, tmp_path):
     from config import config
 
     monkeypatch.delenv("SHERLOCK_SECRET_KEY", raising=False)
-    monkeypatch.setattr(config, "base_dir", tmp_path)
+    monkeypatch.setattr(config, "index_dir", tmp_path / "index")
     cipher = encrypt_secret("value")
     key_file = tmp_path / "index" / ".secret_key"
     assert key_file.exists()

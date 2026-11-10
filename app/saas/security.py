@@ -149,7 +149,7 @@ _FERNET_INFO = b"sherlock-fernet-v1"
 
 
 def _dev_key_path() -> Path:
-    return config.base_dir / "index" / _DEV_KEY_FILENAME
+    return config.index_dir / _DEV_KEY_FILENAME
 
 
 def _read_or_create_dev_key() -> str:

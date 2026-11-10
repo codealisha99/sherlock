@@ -920,8 +920,10 @@ def main():
     # --- Existing Ollama-powered flags (backward compatible) ---
     parser.add_argument("--analyze", "-a", type=str, help="Path to local repository to analyze via Ollama multi-agent pipeline")
     parser.add_argument("--serve", "-s", action="store_true", default=True, help="Start the web server (default)")
-    parser.add_argument("--host", type=str, default="127.0.0.1", help="Server host (default: 127.0.0.1, loopback only)")
-    parser.add_argument("--port", "-p", type=int, default=8080, help="Server port (default: 8080)")
+    parser.add_argument("--host", type=str, default=os.getenv("HOST", "127.0.0.1"),
+                        help="Server host (default: $HOST or 127.0.0.1, loopback only)")
+    parser.add_argument("--port", "-p", type=int, default=int(os.getenv("PORT", "8080")),
+                        help="Server port (default: $PORT or 8080)")
     parser.add_argument("--open", action="store_true", help="Automatically open browser on server start")
     parser.add_argument(
         "--enable-ai",

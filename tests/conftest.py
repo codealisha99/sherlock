@@ -7,6 +7,9 @@ import os
 import tempfile
 
 _TMP = tempfile.mkdtemp(prefix="sherlock_test_")
+# Tests must never reach a real (e.g. production Neon) database.
+os.environ.pop("DATABASE_URL", None)
+os.environ["SHERLOCK_DATA_DIR"] = _TMP
 # Never touch the developer's real index DB from tests.
 os.environ["SHERLOCK_INDEX_DB"] = os.path.join(_TMP, "sherlock.db")
 os.environ.setdefault("SHERLOCK_AUTH_REQUIRED", "false")

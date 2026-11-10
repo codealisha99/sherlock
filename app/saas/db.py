@@ -1,8 +1,12 @@
-"""SQLite persistence for the SaaS layer (users, sessions, keys, jobs, billing).
+"""Persistence for the SaaS layer (users, sessions, keys, jobs, billing).
 
-Kept in a separate database file from the code index so account data can be
-backed up / migrated independently. All methods are thread-safe; each call
-opens a short-lived connection (SQLite handles cross-thread locking).
+Two engines behind one API:
+  * Postgres (e.g. Neon) when DATABASE_URL is a postgres:// URL -- production.
+  * SQLite file otherwise -- local dev and tests.
+
+SQL is written once in a portable subset (`?` placeholders are translated for
+Postgres). Account data is kept apart from the code index so it can be backed
+up and migrated independently. All methods are thread-safe.
 """
 
 from __future__ import annotations
@@ -14,9 +18,19 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Type
 
 from config import config
+
+try:  # optional: only needed when DATABASE_URL points at Postgres
+    import psycopg
+    from psycopg.rows import dict_row
+    from psycopg_pool import ConnectionPool
+
+    _UNIQUE_ERRORS: Tuple[Type[BaseException], ...] = (sqlite3.IntegrityError, psycopg.errors.UniqueViolation)
+except ImportError:  # pragma: no cover - exercised only without psycopg installed
+    psycopg = None  # type: ignore[assignment]
+    _UNIQUE_ERRORS = (sqlite3.IntegrityError,)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -102,20 +116,22 @@ def iso(dt: datetime) -> str:
 
 def _default_db_path() -> Path:
     env = os.getenv("SHERLOCK_SAAS_DB")
-    return Path(env) if env else config.base_dir / "index" / "saas.db"
+    return Path(env) if env else config.index_dir / "saas.db"
 
 
-class SaasStore:
-    """Thin data-access layer. Returns plain dicts; never mutates arguments."""
+def _is_postgres_url(url: Optional[str]) -> bool:
+    return bool(url) and url.split("://", 1)[0] in ("postgres", "postgresql")  # type: ignore[union-attr]
 
-    def __init__(self, db_path: Optional[Path] = None):
-        self.db_path = Path(db_path) if db_path else _default_db_path()
+
+class _SqliteEngine:
+    dialect = "sqlite"
+
+    def __init__(self, db_path: Path):
+        self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._conn() as c:
-            c.executescript(SCHEMA)
 
     @contextmanager
-    def _conn(self) -> Iterator[sqlite3.Connection]:
+    def connection(self) -> Iterator[Any]:
         conn = sqlite3.connect(self.db_path, timeout=10, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -129,18 +145,81 @@ class SaasStore:
         finally:
             conn.close()
 
+    def init_schema(self) -> None:
+        with self.connection() as c:
+            c.executescript(SCHEMA)
+
+    @staticmethod
+    def sql(statement: str) -> str:
+        return statement
+
+
+class _PostgresEngine:
+    dialect = "postgres"
+
+    def __init__(self, url: str):
+        if psycopg is None:
+            raise RuntimeError("DATABASE_URL is Postgres but psycopg is not installed")
+        # ponytail: one pool per process; size via SHERLOCK_DB_POOL_MAX if Neon limits bite.
+        self.pool = ConnectionPool(
+            url,
+            min_size=1,
+            max_size=int(os.getenv("SHERLOCK_DB_POOL_MAX", "10")),
+            kwargs={"row_factory": dict_row},
+            check=ConnectionPool.check_connection,  # Neon drops idle connections
+            open=True,
+        )
+
+    @contextmanager
+    def connection(self) -> Iterator[Any]:
+        with self.pool.connection() as conn:  # commits on success, rolls back on error
+            yield conn
+
+    def init_schema(self) -> None:
+        ddl = SCHEMA.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY")
+        with self.connection() as c:
+            c.execute(ddl)
+
+    @staticmethod
+    def sql(statement: str) -> str:
+        # Our SQL never contains literal '?' or '%', so this translation is exact.
+        return statement.replace("?", "%s")
+
+
+class SaasStore:
+    """Thin data-access layer. Returns plain dicts; never mutates arguments."""
+
+    def __init__(self, db_path: Optional[Path] = None, database_url: Optional[str] = None):
+        url = database_url if database_url is not None else (None if db_path else os.getenv("DATABASE_URL"))
+        if _is_postgres_url(url):
+            self._engine: Any = _PostgresEngine(url)  # type: ignore[arg-type]
+            self.db_path: Optional[Path] = None
+        else:
+            self.db_path = Path(db_path) if db_path else _default_db_path()
+            self._engine = _SqliteEngine(self.db_path)
+        self._engine.init_schema()
+
+    @property
+    def dialect(self) -> str:
+        return self._engine.dialect
+
+    @contextmanager
+    def _conn(self) -> Iterator[Any]:
+        with self._engine.connection() as conn:
+            yield conn
+
     def _one(self, sql: str, args: tuple = ()) -> Optional[Dict[str, Any]]:
         with self._conn() as c:
-            row = c.execute(sql, args).fetchone()
+            row = c.execute(self._engine.sql(sql), args).fetchone()
         return dict(row) if row else None
 
     def _all(self, sql: str, args: tuple = ()) -> List[Dict[str, Any]]:
         with self._conn() as c:
-            return [dict(r) for r in c.execute(sql, args).fetchall()]
+            return [dict(r) for r in c.execute(self._engine.sql(sql), args).fetchall()]
 
     def _exec(self, sql: str, args: tuple = ()) -> int:
         with self._conn() as c:
-            return c.execute(sql, args).rowcount
+            return c.execute(self._engine.sql(sql), args).rowcount
 
     # ------------------------------------------------------------------ users
     def create_user(self, email: str, password_hash: str) -> Dict[str, Any]:
@@ -150,7 +229,7 @@ class SaasStore:
                 "INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
                 (user_id, email, password_hash, iso(utc_now())),
             )
-        except sqlite3.IntegrityError:
+        except _UNIQUE_ERRORS:
             raise ValueError("email_taken")
         return self.get_user(user_id)  # type: ignore[return-value]
 
@@ -232,7 +311,8 @@ class SaasStore:
     # ------------------------------------------------------------ repo owners
     def add_repo_owner(self, repo_id: str, user_id: str, source_url: Optional[str] = None) -> None:
         self._exec(
-            "INSERT OR IGNORE INTO repo_owners (repo_id, user_id, source_url, created_at) VALUES (?, ?, ?, ?)",
+            "INSERT INTO repo_owners (repo_id, user_id, source_url, created_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT (repo_id, user_id) DO NOTHING",
             (repo_id, user_id, source_url, iso(utc_now())),
         )
 
@@ -348,7 +428,7 @@ class SaasStore:
                 (event_id, iso(utc_now())),
             )
             return True
-        except sqlite3.IntegrityError:
+        except _UNIQUE_ERRORS:
             return False
 
     def unmark_webhook(self, event_id: str) -> None:

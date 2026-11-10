@@ -14,6 +14,16 @@ from typing import List, Optional, Set
 from pydantic import BaseModel, Field
 
 
+def _data_dir() -> Path:
+    """Root for everything the server writes (index DBs, clones, analyses).
+
+    Defaults to the repo directory; in production point SHERLOCK_DATA_DIR at a
+    persistent volume.
+    """
+    env = os.getenv("SHERLOCK_DATA_DIR")
+    return Path(env) if env else Path(__file__).resolve().parent
+
+
 class SherlockConfig(BaseModel):
     """Configuration settings for Sherlock."""
 
@@ -71,7 +81,7 @@ class SherlockConfig(BaseModel):
 
     # Quota database path (SQLite, durable usage/reservation records).
     llm_quota_db_path: Path = Field(
-        default_factory=lambda: Path(__file__).resolve().parent / "index" / "llm_quota.db"
+        default_factory=lambda: _data_dir() / "index" / "llm_quota.db"
     )
 
     # Repository run isolation for caching and request metadata.
@@ -120,7 +130,7 @@ class SherlockConfig(BaseModel):
     index_db_path: Path = Field(
         default_factory=lambda: Path(
             os.getenv("SHERLOCK_INDEX_DB")
-            or Path(__file__).resolve().parent / "index" / "sherlock.db"
+            or _data_dir() / "index" / "sherlock.db"
         )
     )
 
@@ -187,9 +197,8 @@ class SherlockConfig(BaseModel):
 
     # Paths
     base_dir: Path = Field(default_factory=lambda: Path(__file__).resolve().parent)
-    workspace_dir: Path = Field(
-        default_factory=lambda: Path(__file__).resolve().parent / "workspace"
-    )
+    workspace_dir: Path = Field(default_factory=lambda: _data_dir() / "workspace")
+    index_dir: Path = Field(default_factory=lambda: _data_dir() / "index")
 
     class Config:
         arbitrary_types_allowed = True
