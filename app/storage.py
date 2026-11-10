@@ -21,6 +21,7 @@ import logging
 import math
 import os
 import sqlite3
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 

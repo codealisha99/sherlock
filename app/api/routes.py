@@ -7,6 +7,7 @@ retrieving the 10-page report, viewing source files, and serving the frontend SP
 import json
 import logging
 import mimetypes
+import re
 from pathlib import Path
 import threading
 import asyncio
@@ -15,6 +16,7 @@ from http.server import BaseHTTPRequestHandler
 from typing import Any, Dict, Optional
 
 from config import config
+from app.saas.router import consume_chat_quota
 from app.orchestrator.orchestrator import Orchestrator
 from app.analysis.context import AnalysisContext
 from app.indexer import RepositoryIndexer
@@ -36,10 +38,10 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        # Restrict CORS to same-origin by default; do not reflect arbitrary origins.
-        self.send_header("Access-Control-Allow-Origin", "null")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Cache-Control", "no-store")
+        from app.saas.security import SECURITY_HEADERS
+        for name, value in SECURITY_HEADERS:
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
 
@@ -47,13 +49,36 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
         self._send_json({"error": message, "status": "error"}, status_code=status_code)
 
     def do_OPTIONS(self):
+        # Same-origin app: no CORS preflight grants.
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
+    # ------------------------------------------------------------------ #
+    # Entry points: SaaS middleware first, then legacy routes.
+    # ------------------------------------------------------------------ #
     def do_GET(self):
+        self._dispatch("GET", self._legacy_get)
+
+    def do_POST(self):
+        self._dispatch("POST", self._legacy_post)
+
+    def do_DELETE(self):
+        self._dispatch("DELETE", self._legacy_delete)
+
+    def _dispatch(self, method: str, legacy) -> None:
+        from app.saas.router import process
+
+        if process(self, method):
+            return
+        try:
+            legacy()
+        except ValueError:
+            # Malformed numeric params etc. -> client error, not a dropped socket.
+            self._send_error_json("Invalid request parameter", 400)
+        except (BrokenPipeError, ConnectionResetError):
+            logger.debug("Client disconnected")
+
+    def _legacy_get(self):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
@@ -181,12 +206,10 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             from app.tools.filesys import SafeFilesystem
             fs = SafeFilesystem(root, config)
             content, truncated = fs.read_file(file_rel_path, max_bytes=config.max_file_size_bytes)
-            lines = content.splitlines()
-            out = []
-            for i, line in enumerate(lines, start=start_line):
-                if end_line is not None and i > end_line:
-                    break
-                out.append({"line": i, "content": line})
+            start_line = max(1, start_line)
+            end_line = max(start_line, min(end_line, start_line + 1000))
+            lines = content.splitlines()[start_line - 1:end_line]
+            out = [{"line": i, "content": line} for i, line in enumerate(lines, start=start_line)]
             self._send_json({
                 "path": file_rel_path,
                 "language": file_row["language"],
@@ -304,7 +327,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
         # 6. Static files / Frontend Single Page Application
         self._serve_static(path)
 
-    def do_POST(self):
+    def _legacy_post(self):
         parsed = urlparse(self.path)
         path = parsed.path
 
@@ -481,7 +504,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                 indexer.store.close()
 
             try:
-                pipeline = RAGPipeline(indexer=indexer, gateway=getattr(self, "gateway", None))
+                pipeline = RAGPipeline(indexer=indexer, gateway=_gateway_for(getattr(self, "saas_user", None), getattr(self, "gateway", None)))
                 result = pipeline.ask(
                     repo_id=repo_id,
                     question=question,
@@ -565,13 +588,11 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Connection", "keep-alive")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.end_headers()
 
             from app.rag.pipeline import RAGPipeline
 
-            pipeline = RAGPipeline(indexer=indexer, gateway=getattr(self, "gateway", None))
+            pipeline = RAGPipeline(indexer=indexer, gateway=_gateway_for(getattr(self, "saas_user", None), getattr(self, "gateway", None)))
 
             def _send_event(event: Dict[str, Any]) -> None:
                 """Send a single SSE event."""
@@ -665,24 +686,33 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             finally:
                 indexer.store.close()
 
+            try:
+                focus = _parse_focus(data.get("focus"))
+            except ValueError as exc:
+                self._send_error_json(str(exc), 400)
+                return
+
+            user = getattr(self, "saas_user", None)
+            if user is not None:
+                limit_error = consume_chat_quota(user)
+                if limit_error:
+                    self._send_error_json(limit_error, 402)
+                    return
+
             # Save user message
-            user_msg_id = indexer.store.add_chat_message(
-                session_id, "user", question,
-                retrieval_method=retrieval_method,
-            )
+            indexer.store.add_chat_message(session_id, "user", question)
 
             # Set SSE headers
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Connection", "keep-alive")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.end_headers()
 
             from app.rag.pipeline import RAGPipeline
 
-            pipeline = RAGPipeline(indexer=indexer, gateway=getattr(self, "gateway", None))
+            pipeline = RAGPipeline(indexer=indexer, gateway=_gateway_for(user, getattr(self, "gateway", None)))
+            pipeline_question = _focused_question(question, focus)
 
             def _send_event(event: Dict[str, Any]) -> None:
                 """Send a single SSE event."""
@@ -700,7 +730,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
                 try:
                     gen = pipeline.ask_stream(
                         repo_id=repo_id,
-                        question=question,
+                        question=pipeline_question,
                         retrieval_method=retrieval_method,
                         limit=limit,
                     )
@@ -743,7 +773,7 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
 
         self._send_error_json("Endpoint not found", 404)
 
-    def do_DELETE(self):
+    def _legacy_delete(self):
         parsed = urlparse(self.path)
         path = parsed.path
 
@@ -761,11 +791,20 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
 
         self._send_error_json("Endpoint not found", 404)
 
+    # Pretty URLs for the HTML pages.
+    PAGE_ROUTES = {
+        "": "landing.html",
+        "pricing": "landing.html",
+        "login": "auth.html",
+        "signup": "auth.html",
+        "settings": "settings.html",
+        "app": "index.html",
+    }
+
     def _serve_static(self, request_path: str):
         """Serve frontend static files (HTML, CSS, JS)."""
-        clean_path = request_path.lstrip("/")
-        if not clean_path or clean_path == "/":
-            clean_path = "index.html"
+        clean_path = request_path.strip("/")
+        clean_path = self.PAGE_ROUTES.get(clean_path, clean_path)
 
         file_path = (self.frontend_dir / clean_path).resolve()
 
@@ -789,11 +828,70 @@ class SherlockRequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", f"{mime_type}; charset=utf-8" if "text" in mime_type or "javascript" in mime_type else mime_type)
             self.send_header("Content-Length", str(len(content)))
+            from app.saas.security import STATIC_SECURITY_HEADERS
+            for name, value in STATIC_SECURITY_HEADERS:
+                self.send_header(name, value)
             self.end_headers()
             self.wfile.write(content)
-        except Exception as e:
-            self._send_error_json(f"Error reading asset: {e}", 500)
+        except OSError:
+            logger.exception("Error reading static asset %s", file_path)
+            self._send_error_json("Error reading asset", 500)
 
     def log_message(self, format, *args):
         # Override to use standard logging
         logger.debug(f"{self.address_string()} - {format % args}")
+
+
+# --------------------------------------------------------------------------- #
+# Chat helpers (SaaS): node focus, per-plan quota, BYOK gateway selection.
+# --------------------------------------------------------------------------- #
+_FOCUS_PATH_RE = re.compile(r"^[\w./@+-]{1,300}$")
+_FOCUS_SYMBOL_RE = re.compile(r"^[A-Za-z_][\w.]{0,200}$")
+
+
+def _parse_focus(raw: Any) -> Optional[Dict[str, str]]:
+    """Validate the optional node focus. Values reach the prompt, so be strict."""
+    if raw in (None, {}):
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("'focus' must be an object")
+    file_path = raw.get("file_path") or ""
+    symbol = raw.get("symbol") or ""
+    node_id = raw.get("node_id") or ""
+    if not all(isinstance(v, str) for v in (file_path, symbol, node_id)):
+        raise ValueError("'focus' fields must be strings")
+    kind, _, rest = node_id.partition(":")
+    if kind == "file":
+        file_path = file_path or rest
+    elif kind == "sym":
+        path_part, _, sym_part = rest.partition("::")
+        file_path = file_path or path_part
+        symbol = symbol or sym_part
+    if file_path and (not _FOCUS_PATH_RE.match(file_path) or ".." in file_path):
+        raise ValueError("Invalid focus file_path")
+    if symbol and not _FOCUS_SYMBOL_RE.match(symbol):
+        raise ValueError("Invalid focus symbol")
+    if not file_path and not symbol:
+        return None
+    return {"file_path": file_path, "symbol": symbol}
+
+
+def _focused_question(question: str, focus: Optional[Dict[str, str]]) -> str:
+    if not focus:
+        return question
+    parts = [focus["symbol"], f"in {focus['file_path']}" if focus["file_path"] else ""]
+    target = " ".join(p for p in parts if p)
+    return f"{question}\n\n(Focus on: {target})"
+
+
+def _gateway_for(user: Optional[Dict[str, Any]], default: Any) -> Any:
+    """Prefer the user's own API key (BYOK); fall back to the platform gateway."""
+    if user is None:
+        return default
+    try:
+        from app.saas.byok import gateway_for_user
+
+        return gateway_for_user(user["id"]) or default
+    except Exception:
+        logger.exception("BYOK gateway construction failed; using platform gateway")
+        return default

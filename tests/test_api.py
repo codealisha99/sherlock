@@ -79,13 +79,13 @@ class TestAPIHandler(unittest.TestCase):
         self.assertIn("ollama", data)
 
     def test_frontend_static_index(self):
-        """Frontend SPA is served at root."""
+        """Landing page at root; workspace SPA at /app."""
         status, _, body = simulate_http_request("GET", "/")
         self.assertEqual(status, 200)
-        content = body.decode("utf-8")
-        self.assertIn("SHERLOCK", content)
-        self.assertIn("sidebar-title", content)
-        self.assertIn("agent-list", content)
+        self.assertIn("landing.js", body.decode("utf-8"))
+        status, _, body = simulate_http_request("GET", "/app")
+        self.assertEqual(status, 200)
+        self.assertIn("app.js", body.decode("utf-8"))
 
     def test_analyze_trigger_with_ai(self):
         """Analyze endpoint starts analysis when AI is enabled."""

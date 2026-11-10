@@ -454,6 +454,8 @@ def cmd_ask(args) -> int:
     pipeline = RAGPipeline(indexer=indexer)
 
     # Attach the LLM Gateway if AI is enabled (Groq/Ollama provider).
+    from app.api.routes import SherlockRequestHandler
+
     gateway = getattr(SherlockRequestHandler, "gateway", None)
     if gateway is not None:
         pipeline.gateway = gateway
