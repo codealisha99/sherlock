@@ -1,0 +1,249 @@
+"""Ingest job runner and SaaS handlers. Git is faked; the thread pool is never started."""
+
+from __future__ import annotations
+
+import json
+import uuid
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import pytest
+
+from app.indexer import RepositoryIndexer
+from app.saas import ingest_routes as ir
+from app.saas.db import SaasStore, set_store
+from app.saas.github_ingest import CloneError
+from app.saas.http import HTTPError, Request
+from app.saas.plans import EVENT_ANALYSIS
+from config import config
+
+URL = "https://github.com/octo/demo"
+APP_PY = (
+    "import os\n"
+    "import yaml\n"
+    "\n"
+    "def run(cmd):\n"
+    "    os.system(cmd)\n"
+    "    return eval(cmd)\n"
+    "\n"
+    "def load(blob):\n"
+    "    return yaml.load(blob)\n"
+)
+
+
+@pytest.fixture()
+def store(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "index_db_path", tmp_path / "idx.db")
+    monkeypatch.setattr(config, "workspace_dir", tmp_path / "ws")
+    db = SaasStore(tmp_path / "s.db")
+    set_store(db)
+    monkeypatch.setattr(ir, "_dispatch", lambda *a, **k: None)  # never start real threads
+    yield db
+    set_store(None)
+
+
+@pytest.fixture()
+def owner(store):
+    return store.create_user(f"{uuid.uuid4().hex[:8]}@example.com", "hash")
+
+
+def _other(store):
+    return store.create_user(f"{uuid.uuid4().hex[:8]}@example.com", "hash")
+
+
+def _user(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {"id": row["id"], "email": row["email"], "plan": row.get("plan", "free")}
+
+
+def _req(user: Optional[Dict[str, Any]], body: Optional[Dict[str, Any]] = None,
+         path_params: Optional[Dict[str, str]] = None, query: Optional[Dict[str, List[str]]] = None,
+         method: str = "POST") -> Request:
+    raw = json.dumps(body).encode() if body is not None else b""
+    return Request(method=method, path="/x", query=query or {}, headers={}, body=raw,
+                   client_ip="127.0.0.1", user=user, path_params=path_params or {})
+
+
+def _fake_cloner(files: Optional[Dict[str, str]] = None):
+    calls: List[tuple] = []
+
+    def cloner(owner_name, repo, branch, dest_root, max_mb):
+        calls.append((owner_name, repo, branch, max_mb))
+        dest = Path(dest_root) / f"{owner_name}__{repo}__{uuid.uuid4().hex}"
+        for rel, text in (files or {"app/main.py": APP_PY, "README.md": "# demo\n"}).items():
+            p = dest / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text)
+        return dest
+
+    cloner.calls = calls  # type: ignore[attr-defined]
+    return cloner
+
+
+def _run(store, owner_row, cloner, *, embed=False, indexer=None, url=URL, tmp=None):
+    job = store.create_job(owner_row["id"], url)
+    ir.run_job(job["id"], owner_row["id"], "octo", "demo", None, url, 50,
+               cloner=cloner, indexer=indexer, embed=embed, repos_dir=tmp)
+    return store.get_job(job["id"])
+
+
+def test_full_job_run_produces_artifacts_and_ownership(store, owner, tmp_path):
+    job = _run(store, owner, _fake_cloner(), tmp=tmp_path / "repos")
+    assert job["status"] == "done" and job["stage"] == "done" and job["progress"] == 100
+    result = job["result"]
+    assert result["repo_name"] == "octo/demo"
+    assert result["stats"]["files"] == 2
+    assert result["summary"]["total"] >= 3  # os.system, eval, yaml.load
+    repo_id = result["repo_id"]
+    assert store.user_owns_repo(owner["id"], repo_id)
+    out = ir.analyses_dir(repo_id)
+    graph = json.loads((out / "graph.json").read_text())
+    findings = json.loads((out / "findings.json").read_text())
+    assert graph["repo_id"] == repo_id and graph["nodes"]
+    assert findings["summary"] == result["summary"]
+    assert any(f["rule_id"] == "py-eval-exec" for f in findings["findings"])
+
+
+def test_embedding_failure_is_warning_not_failure(store, owner, tmp_path):
+    indexer = RepositoryIndexer()
+
+    def broken(repo_id, **kwargs):
+        raise RuntimeError("model not available")
+
+    indexer.embed_chunks = broken  # type: ignore[method-assign]
+    job = _run(store, owner, _fake_cloner(), embed=True, indexer=indexer, tmp=tmp_path / "repos")
+    assert job["status"] == "done"
+    assert job["result"]["stats"]["embeddings"] == 0
+
+
+def test_clone_failure_surfaces_friendly_message(store, owner, tmp_path):
+    def cloner(*args):
+        raise CloneError("Could not clone that repository. Check that it exists and is public.")
+
+    job = _run(store, owner, cloner, tmp=tmp_path / "repos")
+    assert job["status"] == "failed" and job["stage"] == "failed"
+    assert job["error"].startswith("Could not clone")
+
+
+def test_unexpected_error_hides_internals(store, owner, tmp_path):
+    def cloner(*args):
+        raise OSError(f"disk full at {tmp_path}/secret/path")
+
+    job = _run(store, owner, cloner, tmp=tmp_path / "repos")
+    assert job["status"] == "failed"
+    assert job["error"] == ir.GENERIC_FAILURE
+    assert str(tmp_path) not in job["error"]
+
+
+def test_start_ingest_accepts_and_records_usage(store, owner, monkeypatch):
+    dispatched: List[tuple] = []
+    monkeypatch.setattr(ir, "_dispatch", lambda *a: dispatched.append(a))
+    resp = ir.start_ingest(_req(_user(owner), {"url": "https://github.com/octo/demo.git"}))
+    assert resp.status == 202
+    job = resp.body["job"]
+    assert "user_id" not in job and job["status"] == "queued"
+    assert job["github_url"] == URL
+    assert dispatched and dispatched[0][0] == job["id"]
+    assert store.count_usage_since(owner["id"], EVENT_ANALYSIS, datetime.now(timezone.utc) - timedelta(days=1)) == 1
+
+
+def test_start_ingest_rejects_bad_url(store, owner):
+    with pytest.raises(HTTPError) as exc:
+        ir.start_ingest(_req(_user(owner), {"url": "http://evil.example/x"}))
+    assert exc.value.status == 400
+
+
+def test_quota_exceeded_returns_402(store, owner):
+    for _ in range(3):  # free plan allows 3 analyses per month
+        store.record_usage(owner["id"], EVENT_ANALYSIS)
+    with pytest.raises(HTTPError) as exc:
+        ir.start_ingest(_req(_user(owner), {"url": URL}))
+    assert exc.value.status == 402
+    assert "Monthly analysis limit" in exc.value.message
+
+
+def test_two_active_jobs_returns_429(store, owner):
+    store.create_job(owner["id"], URL)
+    store.create_job(owner["id"], URL)
+    with pytest.raises(HTTPError) as exc:
+        ir.start_ingest(_req(_user(owner), {"url": URL}))
+    assert exc.value.status == 429
+
+
+def test_dispatch_failure_marks_job_failed(store, owner, monkeypatch):
+    def boom(*args):
+        raise RuntimeError("executor down")
+
+    monkeypatch.setattr(ir, "_dispatch", boom)
+    resp = ir.start_ingest(_req(_user(owner), {"url": URL}))
+    assert store.get_job(resp.body["job"]["id"])["status"] == "failed"
+
+
+def test_jobs_are_private_to_owner(store, owner):
+    job = store.create_job(owner["id"], URL)
+    intruder = _other(store)
+    with pytest.raises(HTTPError) as exc:
+        ir.get_job(_req(_user(intruder), path_params={"job_id": job["id"]}, method="GET"))
+    assert exc.value.status == 404
+    assert ir.get_job(_req(_user(owner), path_params={"job_id": job["id"]}, method="GET")).body["job"]["id"] == job["id"]
+    assert [j["id"] for j in ir.list_jobs(_req(_user(intruder), method="GET")).body["jobs"]] == []
+
+
+def test_repo_endpoints_404_for_non_owner(store, owner, tmp_path):
+    job = _run(store, owner, _fake_cloner(), tmp=tmp_path / "repos")
+    repo_id = job["result"]["repo_id"]
+    intruder = _other(store)
+    for handler in (ir.get_graph, ir.get_findings):
+        with pytest.raises(HTTPError) as exc:
+            handler(_req(_user(intruder), path_params={"repo_id": repo_id}, method="GET"))
+        assert exc.value.status == 404
+    with pytest.raises(HTTPError) as exc:
+        ir.get_node(_req(_user(intruder), path_params={"repo_id": repo_id}, query={"id": ["file:app/main.py"]}, method="GET"))
+    assert exc.value.status == 404
+
+
+def test_repo_id_traversal_is_rejected(store, owner):
+    with pytest.raises(HTTPError) as exc:
+        ir.get_graph(_req(_user(owner), path_params={"repo_id": ".."}, method="GET"))
+    assert exc.value.status == 404
+
+
+def test_owner_reads_graph_findings_and_node(store, owner, tmp_path):
+    job = _run(store, owner, _fake_cloner(), tmp=tmp_path / "repos")
+    repo_id = job["result"]["repo_id"]
+    params = {"repo_id": repo_id}
+    graph = ir.get_graph(_req(_user(owner), path_params=params, method="GET")).body
+    assert any(n["id"] == "sym:app/main.py::run" for n in graph["nodes"])
+    findings = ir.get_findings(_req(_user(owner), path_params=params, method="GET")).body
+    assert findings["summary"]["total"] == len(findings["findings"])
+    node = ir.get_node(_req(_user(owner), path_params=params, query={"id": ["sym:app/main.py::run"]}, method="GET")).body
+    assert node["node"]["type"] == "function"
+    assert any(f["rule_id"] == "py-os-shell" for f in node["findings"])
+    assert any("def run" in row["content"] for row in node["source"]["lines"])
+    with pytest.raises(HTTPError) as exc:
+        ir.get_node(_req(_user(owner), path_params=params, query={"id": ["sym:app/main.py::missing"]}, method="GET"))
+    assert exc.value.status == 404
+    with pytest.raises(HTTPError) as exc:
+        ir.get_node(_req(_user(owner), path_params=params, method="GET"))
+    assert exc.value.status == 400
+
+
+def test_list_repos_only_caller_and_no_server_path(store, owner, tmp_path):
+    _run(store, owner, _fake_cloner(), tmp=tmp_path / "repos")
+    body = ir.list_repos(_req(_user(owner), method="GET")).body
+    assert body["count"] == 1
+    assert "path" not in body["repositories"][0]
+    assert body["repositories"][0]["name"] == "octo/demo"
+    assert ir.list_repos(_req(_user(_other(store)), method="GET")).body["count"] == 0
+
+
+def test_anonymous_list_repos_is_empty(store):
+    assert ir.list_repos(_req(None, method="GET")).body == {"repositories": [], "count": 0}
+
+
+def test_missing_artifacts_return_404(store, owner):
+    repo_id = str(uuid.uuid4())
+    store.add_repo_owner(repo_id, owner["id"], source_url=URL)
+    with pytest.raises(HTTPError) as exc:
+        ir.get_graph(_req(_user(owner), path_params={"repo_id": repo_id}, method="GET"))
+    assert exc.value.status == 404
