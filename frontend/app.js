@@ -1,5 +1,6 @@
 /**
- * Sherlock workspace (/app): auth gate, start screen, job progress, repo workspace shell.
+ * Sherlock workspace (/app): auth gate, top bar (breadcrumb + account menu), start screen,
+ * job progress timeline, and the repo workspace shell with keyboard-navigable tabs.
  * Load order (index.html): util.js, api.js, ai.js, finding-view.js, node-panel.js, graph.js,
  * findings.js, chat.js, report.js, app.js. Every module exposes init* functions called from boot().
  */
@@ -15,6 +16,10 @@ const STAGE_LABELS = {
   graphing: "Graphing",
   done: "Done",
 };
+const STAGE_STATE_TEXT = { done: "", active: "Now", pending: "" };
+const JOB_STATUS_LABELS = { queued: "Queued", running: "Running", done: "Done", failed: "Failed" };
+const EXAMPLE_REPO_URL = "https://github.com/pallets/itsdangerous";
+const SKELETON_ROWS = 3;
 
 const appEls = {
   globalError: document.getElementById("global-error"),
@@ -22,6 +27,13 @@ const appEls = {
   userEmail: document.getElementById("user-email"),
   planBadge: document.getElementById("plan-badge"),
   logout: document.getElementById("btn-logout"),
+  accountBtn: document.getElementById("btn-account"),
+  accountMenu: document.getElementById("account-menu"),
+  accountWrap: document.querySelector(".account"),
+  crumbRepos: document.getElementById("crumb-repos"),
+  crumbRepo: document.getElementById("crumb-repo"),
+  crumbRepoName: document.getElementById("crumb-repo-name"),
+  exampleButtons: Array.from(document.querySelectorAll("[data-example]")),
   views: {
     start: document.getElementById("view-start"),
     progress: document.getElementById("view-progress"),
@@ -47,9 +59,11 @@ const appEls = {
   repoName: document.getElementById("repo-name"),
   repoUrl: document.getElementById("repo-url"),
   repoScore: document.getElementById("repo-score"),
+  severityBar: document.getElementById("severity-bar"),
   severityRow: document.getElementById("severity-counts"),
   backToRepos: document.getElementById("btn-back-repos"),
   wsTabs: Array.from(document.querySelectorAll(".ws-tab")),
+  tabInk: document.querySelector(".ws-tab-ink"),
   panels: {
     graph: document.getElementById("panel-graph"),
     findings: document.getElementById("panel-findings"),
@@ -69,15 +83,20 @@ function boot() {
   initFindings();
   initChat();
   initReport();
+  initAccountMenu();
 
   appEls.analyzeForm.addEventListener("submit", onAnalyzeSubmit);
   appEls.retryBtn.addEventListener("click", retryAnalysis);
   appEls.backFromProgress.addEventListener("click", backToStart);
   appEls.backToRepos.addEventListener("click", backToStart);
+  appEls.crumbRepos.addEventListener("click", backToStart);
   appEls.logout.addEventListener("click", logout);
+  appEls.exampleButtons.forEach((btn) => btn.addEventListener("click", fillExampleUrl));
   appEls.wsTabs.forEach((tab) => {
     tab.addEventListener("click", () => showWorkspaceTab(tab.dataset.view));
+    tab.addEventListener("keydown", onTabKeydown);
   });
+  window.addEventListener("resize", moveTabInk);
   checkSession();
 }
 
@@ -86,8 +105,64 @@ function showGlobalError(message) {
   appEls.globalError.classList.toggle("hidden", !message);
 }
 
+/** Shows one view. Setting `view-enter` while displayed replays its entrance animation. */
 function showView(name) {
-  Object.entries(appEls.views).forEach(([key, node]) => node.classList.toggle("hidden", key !== name));
+  Object.entries(appEls.views).forEach(([key, node]) => {
+    const visible = key === name;
+    node.classList.toggle("hidden", !visible);
+    node.classList.toggle("view-enter", visible);
+  });
+  const inRepo = name === "workspace";
+  appEls.crumbRepo.classList.toggle("hidden", !inRepo);
+  appEls.crumbRepos.setAttribute("aria-current", String(!inRepo));
+  if (inRepo) moveTabInk();
+}
+
+// ---------------------------------------------------------------------------
+// Top bar: account menu (Settings, Log out)
+// ---------------------------------------------------------------------------
+
+function initAccountMenu() {
+  const { accountBtn: btn, accountMenu: menu } = appEls;
+  const menuItems = () => Array.from(menu.querySelectorAll('[role="menuitem"]'));
+  const isOpen = () => !menu.classList.contains("hidden");
+
+  function setOpen(open, focusFirst = false) {
+    menu.classList.toggle("hidden", !open);
+    btn.setAttribute("aria-expanded", String(open));
+    if (open && focusFirst) menuItems()[0].focus();
+  }
+
+  btn.addEventListener("click", () => (isOpen() ? setOpen(false) : setOpen(true, true)));
+  btn.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true, true);
+    }
+  });
+  menu.addEventListener("keydown", (e) => {
+    const items = menuItems();
+    const index = items.indexOf(document.activeElement);
+    if (e.key === "Escape") {
+      setOpen(false);
+      btn.focus();
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      items[(index + step + items.length) % items.length].focus();
+    } else if (e.key === "Tab") {
+      setOpen(false);
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && isOpen()) {
+      setOpen(false);
+      btn.focus();
+    }
+  });
+  document.addEventListener("click", (e) => {
+    if (isOpen() && !appEls.accountWrap.contains(e.target)) setOpen(false);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +201,7 @@ async function checkSession() {
 
 function renderUser(user) {
   appEls.userEmail.textContent = user.email || "";
+  appEls.accountBtn.setAttribute("aria-label", `Account menu for ${user.email || "your account"}`);
   const plan = user.plan || "free";
   appEls.planBadge.textContent = `${plan.charAt(0).toUpperCase()}${plan.slice(1)} plan`;
 }
@@ -171,6 +247,12 @@ function setAnalyzeBusy(busy) {
   appEls.analyzeBtn.textContent = busy ? "Starting..." : "Analyze";
 }
 
+function fillExampleUrl() {
+  appEls.urlInput.value = EXAMPLE_REPO_URL;
+  appEls.analyzeError.hidden = true;
+  appEls.urlInput.focus();
+}
+
 async function onAnalyzeSubmit(event) {
   event.preventDefault();
   const url = appEls.urlInput.value.trim();
@@ -200,10 +282,21 @@ function analysisIdForRepo(repoId) {
 }
 
 async function loadStartLists() {
+  setListSkeleton(appEls.repoList);
+  setListSkeleton(appEls.jobList);
   const [reposRes, jobsRes] = await Promise.allSettled([API.repos(), API.jobs()]);
   listState.jobs = jobsRes.status === "fulfilled" ? (jobsRes.value.jobs || []) : [];
   renderJobList(jobsRes);
   renderRepoList(reposRes);
+}
+
+function setListSkeleton(list) {
+  list.replaceChildren(...Array.from({ length: SKELETON_ROWS }, () => el(
+    "li",
+    { className: "skeleton-row", "aria-hidden": "true" },
+    el("span", { className: "skeleton-bar long" }),
+    el("span", { className: "skeleton-bar short" }),
+  )));
 }
 
 function setListMessage(list, message) {
@@ -229,6 +322,7 @@ function renderRepoList(result) {
       },
       el("span", { className: "item-title", text: name }),
       el("span", { className: "item-sub", text: repo.github_url || "" }),
+      el("span", { className: "item-open", text: "Open" }),
     ));
   }));
 }
@@ -249,7 +343,13 @@ function renderJobList(result) {
     },
     el("span", { className: "item-title", text: job.result?.repo_name || repoNameFromUrl(job.github_url) }),
     el("span", { className: "item-sub", text: job.github_url || "" }),
-    el("span", { className: `status-chip status-${job.status}`, text: job.status }),
+    el("span", { className: "item-state" }, el("span", {
+      className: `status-chip status-${job.status}`,
+      text: JOB_STATUS_LABELS[job.status] || job.status,
+    })),
+    job.status === "failed" && job.error
+      ? el("span", { className: "job-error", text: job.error })
+      : null,
   ))));
 }
 
@@ -284,10 +384,12 @@ function startProgress(jobId, githubUrl) {
   appEls.progressTrack.setAttribute("aria-valuenow", "0");
   appEls.progressFill.style.width = "0%";
   setStatus(appEls.progressStatus, "Queued...");
+  renderStepper(null, "queued");
   showView("progress");
   pollJob(jobId);
 }
 
+/** Vertical timeline: done / active / pending per stage. The active stage carries the pulse indicator. */
 function renderStepper(stage, status) {
   const index = STAGES.indexOf(stage);
   const finished = status === "done";
@@ -297,11 +399,10 @@ function renderStepper(stage, status) {
     else if (i === index) state = "active";
     return el(
       "li",
-      {
-        className: `stage stage-${state}`,
-        "aria-current": state === "active" ? "step" : false,
-        text: STAGE_LABELS[name],
-      },
+      { className: `stage stage-${state}`, "aria-current": state === "active" ? "step" : false },
+      el("span", { className: "stage-dot", "aria-hidden": "true" }),
+      el("span", { className: "stage-label", text: STAGE_LABELS[name] }),
+      el("span", { className: "stage-state", text: STAGE_STATE_TEXT[state] }),
     );
   }));
 }
@@ -402,12 +503,14 @@ async function openRepo({ id, name, analysisId }) {
   workspaceState.analysisId = analysisId || null;
 
   appEls.repoName.textContent = workspaceState.repoName;
+  appEls.crumbRepoName.textContent = workspaceState.repoName;
   const job = listState.jobs.find((j) => j.repo_id === id);
   const url = safeGithubLink(job && job.github_url);
   appEls.repoUrl.textContent = url || "";
   appEls.repoUrl.href = url || "#";
   appEls.repoUrl.hidden = !url;
   appEls.repoScore.textContent = "Loading...";
+  appEls.severityBar.replaceChildren();
   appEls.severityRow.replaceChildren();
   appEls.tabReport.classList.toggle("hidden", !analysisId);
 
@@ -432,20 +535,23 @@ function closeRepo() {
   setChatRepo(null);
 }
 
+/** Score as a number with a small label, plus the severity distribution (bar and legend). */
 function renderWorkspaceHeader(summary) {
   if (!summary) {
     appEls.repoScore.textContent = "Score unavailable";
+    appEls.severityBar.replaceChildren();
+    appEls.severityRow.replaceChildren();
     return;
   }
-  appEls.repoScore.textContent = summary.score != null ? `Score ${summary.score}/100` : "Score unavailable";
+  const hasScore = summary.score != null;
+  appEls.repoScore.replaceChildren(
+    el("strong", { className: "score-value", text: hasScore ? String(summary.score) : "n/a" }),
+    el("span", { className: "score-label", text: hasScore ? "/ 100 score" : "score" }),
+  );
   const bySeverity = summary.by_severity || {};
-  const counts = SEVERITY_ORDER.filter((sev) => bySeverity[sev]).map((sev) => el(
-    "li",
-    { className: "severity-count" },
-    severityBadge(sev),
-    el("span", { text: String(bySeverity[sev]) }),
-  ));
-  appEls.severityRow.replaceChildren(...(counts.length ? counts : [el("li", { className: "text-muted", text: "No findings" })]));
+  appEls.severityBar.replaceChildren(...severitySegments(bySeverity));
+  const legend = severityLegendItems(bySeverity);
+  appEls.severityRow.replaceChildren(...(legend.length ? legend : [el("li", { className: "text-muted", text: "No findings" })]));
 }
 
 function showWorkspaceTab(name) {
@@ -456,6 +562,32 @@ function showWorkspaceTab(name) {
     tab.tabIndex = active ? 0 : -1;
   });
   Object.entries(appEls.panels).forEach(([key, panel]) => panel.classList.toggle("hidden", key !== name));
+  moveTabInk();
   if (name === "graph") resizeGraph();
   if (name === "report") ensureReportLoaded();
+}
+
+/** Slides the underline under the active tab (transform + width). */
+function moveTabInk() {
+  const active = appEls.wsTabs.find((tab) => tab.classList.contains("active"));
+  if (!active || !active.offsetWidth) return;
+  appEls.tabInk.style.width = `${active.offsetWidth}px`;
+  appEls.tabInk.style.transform = `translateX(${active.offsetLeft}px)`;
+}
+
+/** Arrow keys, Home and End move between visible tabs (roving tabindex). */
+function onTabKeydown(e) {
+  const tabs = appEls.wsTabs.filter((tab) => !tab.classList.contains("hidden"));
+  const index = tabs.indexOf(e.currentTarget);
+  const targets = {
+    ArrowRight: tabs[(index + 1) % tabs.length],
+    ArrowLeft: tabs[(index - 1 + tabs.length) % tabs.length],
+    Home: tabs[0],
+    End: tabs[tabs.length - 1],
+  };
+  const next = targets[e.key];
+  if (!next) return;
+  e.preventDefault();
+  next.focus();
+  showWorkspaceTab(next.dataset.view);
 }

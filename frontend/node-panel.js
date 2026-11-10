@@ -1,7 +1,8 @@
 /**
- * Right-side node detail panel (a bottom sheet on narrow screens): metrics, findings with
- * triage verdicts, neighbors, source, "Ask about this", and "Verify with AI" for the node.
- * Requires util.js, api.js, ai.js, finding-view.js, graph.js (selectGraphNode), chat.js (openChatWithFocus).
+ * Right-side node detail panel (a bottom sheet on narrow screens): identity chips, metrics ledger,
+ * "Ask about this", findings (shared findingRow), suggested fixes, depends-on / used-by rows, source.
+ * Requires util.js, api.js, ai.js, finding-view.js, findings.js (findingRow), graph.js
+ * (selectGraphNode, clearGraphSelection), chat.js (openChatWithFocus).
  */
 
 const nodePanelEls = {
@@ -28,6 +29,7 @@ function closeNodePanel() {
   currentNodeId = null;
   nodePanelEls.panel.classList.add("hidden");
   nodePanelEls.content.replaceChildren();
+  clearGraphSelection();
 }
 
 async function openNodePanel(nodeId) {
@@ -74,14 +76,14 @@ function renderNodeDetail(detail) {
       { className: "node-tags" },
       el("span", { className: "badge badge-subtle", text: node.type || "node" }),
       el("span", { className: `health-tag health-${node.health || "none"}`, text: healthLabel(node.health) }),
-      node.language ? el("span", { className: "badge badge-subtle", text: `Language: ${node.language}` }) : null,
+      node.language ? el("span", { className: "badge badge-subtle", text: node.language }) : null,
     ),
     location ? el("p", { className: "node-path", text: location }) : null,
     renderMetrics(node.metrics || {}),
     el(
       "button",
       {
-        className: "btn btn-primary btn-sm",
+        className: "btn btn-primary node-action",
         type: "button",
         on: {
           click: () => openChatWithFocus({
@@ -94,8 +96,9 @@ function renderNodeDetail(detail) {
       "Ask about this",
     ),
     renderNodeFindings(findings),
-    renderNeighborList("Depends on (outgoing)", neighbors.outgoing || []),
-    renderNeighborList("Used by (incoming)", neighbors.incoming || []),
+    renderSuggestedFixes(findings),
+    renderNeighborList("Depends on", neighbors.outgoing || []),
+    renderNeighborList("Used by", neighbors.incoming || []),
     renderSource(detail.source, findings),
   );
 }
@@ -133,33 +136,32 @@ function nodeVerifyControls(findings) {
   );
 }
 
+/** Findings with a CWE summary line; each row is the shared findingRow (no graph jump on this node). */
 function renderNodeFindings(findings) {
   const heading = el("h3", { text: `Findings (${findings.length})` });
   if (!findings.length) {
     return el("section", { className: "node-section" }, heading, el("p", { className: "text-muted", text: "No findings for this node." }));
   }
+  const cwes = [...new Set(findings.map((f) => f.cwe).filter(Boolean))];
   return el(
     "section",
     { className: "node-section" },
     heading,
+    cwes.length ? el("p", { className: "mono small text-muted", text: cwes.join(" · ") }) : null,
     nodeVerifyControls(findings),
-    el("ul", { className: "finding-stack" }, findings.map((f) => el(
-      "li",
-      { className: "finding-item" },
-      el(
-        "div",
-        { className: "finding-head" },
-        severityBadge(f.severity),
-        el("strong", { text: f.title || f.rule_id || "Finding" }),
-        f.cwe ? el("span", { className: "cwe-tag", text: f.cwe }) : null,
-        triageBadge(f),
-      ),
-      f.line ? el("p", { className: "text-muted", text: `Line ${f.line}` }) : null,
-      f.description ? el("p", { text: f.description }) : null,
-      f.recommendation ? el("p", { className: "finding-fix" }, el("strong", { text: "Fix: " }), f.recommendation) : null,
-      dependencyDetails(f),
-      triageDetails(f),
-    ))),
+    el("ul", { className: "findings-list compact" }, findings.map((f) => findingRow(f, { navigable: false }))),
+  );
+}
+
+/** Distinct recommendations from this node's findings. Hidden when none are provided. */
+function renderSuggestedFixes(findings) {
+  const fixes = [...new Set(findings.map((f) => f.recommendation).filter(Boolean))];
+  if (!fixes.length) return null;
+  return el(
+    "section",
+    { className: "node-section" },
+    el("h3", { text: "Suggested fixes" }),
+    el("ul", { className: "plain-list fix-list" }, fixes.map((fix) => el("li", { className: "small", text: fix }))),
   );
 }
 

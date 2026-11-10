@@ -12,9 +12,10 @@ if (window.mermaid) {
     securityLevel: "strict",
     themeVariables: {
       background: "#fffdf8",
-      primaryColor: "#7c9a6d",
-      primaryBorderColor: "#5f7a54",
-      lineColor: "#8a8175",
+      primaryColor: "#f5f2ea",
+      primaryBorderColor: "#15171c",
+      primaryTextColor: "#15171c",
+      lineColor: "#8a7f6c",
     },
   });
 }
@@ -54,6 +55,9 @@ const reportState = {
   pendingMermaid: [],
 };
 
+// Element that had focus before the source viewer opened; focus returns there on close.
+let modalReturnFocus = null;
+
 function initReport() {
   reportEls.prev.addEventListener("click", () => navigateReport(reportState.page - 1));
   reportEls.next.addEventListener("click", () => navigateReport(reportState.page + 1));
@@ -75,9 +79,7 @@ function initReport() {
   reportEls.modal.addEventListener("click", (e) => {
     if (e.target === reportEls.modal) closeFileViewer();
   });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !reportEls.modal.classList.contains("hidden")) closeFileViewer();
-  });
+  document.addEventListener("keydown", onModalKeydown);
 }
 
 /** Called when a different repo is opened. */
@@ -344,12 +346,35 @@ function page10(c) {
 // Code viewer modal (report file links only; graph uses the node panel)
 // ---------------------------------------------------------------------------
 
+/** Escape closes; Tab stays inside the dialog (focus trap). */
+function onModalKeydown(e) {
+  if (reportEls.modal.classList.contains("hidden")) return;
+  if (e.key === "Escape") {
+    closeFileViewer();
+    return;
+  }
+  if (e.key !== "Tab") return;
+  const items = focusableIn(reportEls.modal);
+  if (!items.length) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
 async function openFileViewer(filepath) {
   const analysisId = reportState.analysisId;
   if (!analysisId) return;
+  modalReturnFocus = document.activeElement;
   reportEls.modalPath.textContent = `Loading ${filepath}...`;
   reportEls.modalCode.textContent = "Fetching source...";
   reportEls.modal.classList.remove("hidden");
+  reportEls.modalClose.focus();
   try {
     const data = await API.file(analysisId, filepath);
     reportEls.modalPath.textContent = data.path + (data.truncated ? " (truncated)" : "");
@@ -360,5 +385,8 @@ async function openFileViewer(filepath) {
 }
 
 function closeFileViewer() {
+  if (reportEls.modal.classList.contains("hidden")) return;
   reportEls.modal.classList.add("hidden");
+  if (modalReturnFocus && modalReturnFocus.isConnected) modalReturnFocus.focus();
+  modalReturnFocus = null;
 }

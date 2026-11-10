@@ -1,6 +1,7 @@
 /**
- * Findings tab: summary cards, severity/category/triage filters, sorted list, and AI verification.
- * Clicking a finding's row switches to the Graph tab and selects its node.
+ * Findings tab: one summary band, verification row, filter chip groups, and a ruled list.
+ * findingRow() is the shared row used by the node panel too: a toggle expands the details,
+ * and the location button selects the finding's graph node.
  * Requires util.js, api.js, ai.js, finding-view.js, graph.js (selectGraphNode),
  * app.js (showWorkspaceTab, renderWorkspaceHeader).
  */
@@ -32,6 +33,8 @@ const SORTERS = {
   file: (a, b) => compareText(a.file_path, b.file_path) || (Number(a.line) || 0) - (Number(b.line) || 0),
   category: (a, b) => compareText(a.category, b.category) || severityRank(a) - severityRank(b),
 };
+
+let findingRowSeq = 0;
 
 function severityRank(finding) {
   const rank = SEVERITY_ORDER.indexOf(finding.severity);
@@ -91,43 +94,32 @@ function applyFindings(data) {
   return findingsState.summary;
 }
 
-function statCard(label, value, extraClass = "") {
-  return el(
-    "div",
-    { className: `stat-card ${extraClass}`.trim() },
-    el("span", { className: "stat-label", text: label }),
-    el("strong", { className: "stat-value", text: String(value) }),
-  );
-}
-
-/** Dependency CVE summary; shows the server's error text when the lookup failed. */
-function dependencyCard(deps) {
-  const card = (value, sub) => el(
-    "div",
-    { className: "stat-card stat-dep" },
-    el("span", { className: "stat-label", text: "Dependencies" }),
-    el("strong", { className: "stat-value", text: value }),
-    el("span", { className: "stat-sub", text: sub }),
-  );
-  if (!deps) return card("n/a", "Not scanned");
-  if (deps.error) return card("Unavailable", String(deps.error));
+/** Dependency CVE line; shows the server's error text when the lookup failed. */
+function dependencyLine(deps) {
+  if (!deps) return "Dependencies not scanned";
+  if (deps.error) return `Dependencies unavailable: ${deps.error}`;
   const ecosystems = (deps.ecosystems || []).join(", ") || "no supported manifests";
-  return card(`${deps.vulnerable ?? 0} of ${deps.scanned ?? 0}`, `vulnerable · ${ecosystems}`);
+  return `${deps.vulnerable ?? 0} of ${deps.scanned ?? 0} dependencies vulnerable · ${ecosystems}`;
 }
 
+/**
+ * One compact band with what the workspace header doesn't show (the header already has
+ * score + severity distribution): totals, triage state, categories, dependencies.
+ */
 function renderFindingsSummary() {
   const summary = findingsState.summary;
-  const bySeverity = summary.by_severity || {};
   const byCategory = summary.by_category || {};
   const total = summary.total != null ? summary.total : findingsState.findings.length;
   findingsEls.summary.replaceChildren(
-    statCard("Score", summary.score != null ? `${summary.score}/100` : "n/a", "stat-score"),
-    statCard("Total", total),
-    ...SEVERITY_ORDER.map((sev) => statCard(sev, bySeverity[sev] || 0, `sev-${sev}`)),
-    ...Object.entries(byCategory).map(([category, count]) => statCard(category, count)),
-    dependencyCard(summary.dependencies),
-    statCard("Triaged", summary.triaged ?? 0),
-    statCard("False positives", summary.false_positives ?? 0),
+    el(
+      "div",
+      { className: "band-lines" },
+      el("span", {}, el("strong", { text: String(total) }), ` findings · triaged ${summary.triaged ?? 0} · false positives ${summary.false_positives ?? 0}`),
+      Object.keys(byCategory).length
+        ? el("span", { text: Object.entries(byCategory).map(([cat, n]) => `${cat} ${n}`).join(" · ") })
+        : null,
+      el("span", { text: dependencyLine(summary.dependencies) }),
+    ),
   );
 }
 
@@ -154,7 +146,7 @@ function fillChipGroup(container, values, key) {
       },
     );
   });
-  container.replaceChildren(...(chips.length ? chips : [el("span", { className: "text-muted", text: "None" })]));
+  container.replaceChildren(...(chips.length ? chips : [el("span", { className: "text-muted small", text: "None" })]));
 }
 
 /** Immutable toggle: replaces the set instead of mutating it. */
@@ -203,7 +195,7 @@ function renderFindingsList() {
   const sorter = SORTERS[findingsEls.sort.value] || SORTERS.severity;
   const items = [...visibleFindings()].sort(sorter);
   findingsEls.empty.classList.toggle("hidden", items.length > 0);
-  findingsEls.list.replaceChildren(...items.map(findingItem));
+  findingsEls.list.replaceChildren(...items.map((finding) => findingRow(finding)));
 }
 
 function locationLabel(finding) {
@@ -218,42 +210,63 @@ function findingTarget(finding) {
   return finding.file_path ? `file:${finding.file_path}` : "";
 }
 
-/** One finding: a row that jumps to its node (when it has one), then details, triage, and verify. */
-function findingItem(finding) {
-  const navigable = Boolean(findingTarget(finding));
-  const row = el(
-    navigable ? "button" : "div",
+/** Toggles one row's detail panel. Only the button's aria-expanded and the hidden flag change. */
+function toggleFindingDetail(toggle, detail) {
+  const open = toggle.getAttribute("aria-expanded") !== "true";
+  toggle.setAttribute("aria-expanded", String(open));
+  detail.hidden = !open;
+}
+
+/** Snippet, description, fix, dependency and triage detail, plus the per-finding verify action. */
+function findingDetailNodes(finding) {
+  return [
+    finding.snippet ? el("pre", { className: "code-block finding-snippet", text: finding.snippet }) : null,
+    finding.description ? el("p", { text: finding.description }) : null,
+    finding.recommendation
+      ? el("p", { className: "finding-fix" }, el("strong", { text: "Fix: " }), finding.recommendation)
+      : null,
+    dependencyDetails(finding),
+    occurrencesBlock(finding, (path) => goToFinding({ file_path: path })),
+    triageDetails(finding),
+    el("div", { className: "finding-verify-row" }, verifyFindingButton(finding)),
+  ];
+}
+
+/**
+ * One finding as a ruled row. The toggle expands details (aria-expanded). The location is a
+ * button that jumps to the graph when `navigable` (Findings tab) and the finding has a target.
+ */
+function findingRow(finding, { navigable = true } = {}) {
+  const detailId = `finding-detail-${++findingRowSeq}`;
+  const detail = el("div", { className: "finding-detail", id: detailId, hidden: true }, findingDetailNodes(finding));
+  const categoryLine = [finding.category, finding.cwe].filter(Boolean).join(" · ");
+  const toggle = el(
+    "button",
     {
-      className: navigable ? "finding-row" : "finding-row finding-row-static",
-      type: navigable ? "button" : undefined,
-      on: navigable ? { click: () => goToFinding(finding) } : undefined,
+      className: "finding-toggle",
+      type: "button",
+      "aria-expanded": "false",
+      "aria-controls": detailId,
+      on: { click: () => toggleFindingDetail(toggle, detail) },
     },
     severityBadge(finding.severity),
     el(
       "span",
       { className: "finding-main" },
       el("span", { className: "finding-title", text: finding.title || finding.rule_id || "Finding" }),
-      el("span", { className: "finding-loc", text: locationLabel(finding) }),
+      categoryLine ? el("span", { className: "finding-meta", text: categoryLine }) : null,
     ),
-    el(
-      "span",
-      { className: "finding-side" },
-      triageBadge(finding),
-      el("span", { className: "finding-meta", text: `${finding.category || ""}${finding.cwe ? ` · ${finding.cwe}` : ""}` }),
-    ),
+    el("span", { className: "finding-side" }, triageBadge(finding), el("span", { className: "chevron", "aria-hidden": "true" })),
   );
+  const canJump = navigable && Boolean(findingTarget(finding));
+  const location = canJump
+    ? el("button", { className: "finding-loc", type: "button", text: locationLabel(finding), on: { click: () => goToFinding(finding) } })
+    : el("span", { className: "finding-loc", text: locationLabel(finding) });
   return el(
     "li",
-    { className: "finding-li" },
-    row,
-    el(
-      "div",
-      { className: "finding-extra" },
-      dependencyDetails(finding),
-      occurrencesBlock(finding, (path) => goToFinding({ file_path: path })),
-      triageDetails(finding),
-      verifyFindingButton(finding),
-    ),
+    { className: canJump ? "finding-li" : "finding-li finding-row-static" },
+    el("div", { className: "finding-row" }, toggle, location),
+    detail,
   );
 }
 

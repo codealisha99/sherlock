@@ -7,25 +7,44 @@
   <title>Sherlock Workspace</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tokens.css">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body class="workspace-page">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <div class="app-shell">
-    <header class="app-header">
-      <div class="topbar-left">
-        <a class="logo" href="/" aria-label="Sherlock home">
-          <span class="magnifier" aria-hidden="true">🔍</span>
-          <span class="logo-title">SHERLOCK</span>
+    <header class="topbar">
+      <div class="topbar-start">
+        <a class="brand" href="/" aria-label="Sherlock home">
+          <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#15171c" stroke-width="2.2"/>
+            <line x1="18" y1="18" x2="25" y2="25" stroke="#15171c" stroke-width="2.6" stroke-linecap="round"/>
+            <circle cx="12" cy="12" r="2.6" fill="#2a44c4"/>
+          </svg>
+          <span class="brand-name">Sherlock</span>
         </a>
+        <nav class="crumbs" aria-label="Breadcrumb">
+          <ol>
+            <li><button id="crumb-repos" class="crumb" type="button">Repositories</button></li>
+            <li id="crumb-repo" class="crumb-current hidden"><span class="crumb-sep" aria-hidden="true">/</span><span id="crumb-repo-name"></span></li>
+          </ol>
+        </nav>
       </div>
-      <div class="topbar-right">
-        <span id="plan-badge" class="badge badge-subtle">Free plan</span>
-        <span id="user-email" class="user-email"></span>
-        <a class="btn btn-secondary btn-sm" href="/settings">Settings</a>
-        <button id="btn-logout" class="btn btn-secondary btn-sm" type="button">Log out</button>
+      <div class="topbar-end">
+        <span id="plan-badge" class="plan-badge">Free plan</span>
+        <div class="account">
+          <button id="btn-account" class="account-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu">
+            <span class="account-avatar" aria-hidden="true">@</span>
+            <span id="user-email" class="account-email"></span>
+            <svg class="account-chevron" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div id="account-menu" class="account-menu hidden" role="menu" aria-label="Account">
+            <a class="menu-item" role="menuitem" href="/settings">Settings</a>
+            <button id="btn-logout" class="menu-item" role="menuitem" type="button">Log out</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -35,47 +54,66 @@
 
       <!-- Start screen -->
       <section id="view-start" class="view hidden" aria-labelledby="start-title">
-        <h1 id="start-title">Analyze a GitHub repository</h1>
-        <p class="lead">Paste a public GitHub URL. Sherlock clones it, maps the code graph, and scans for security and quality issues.</p>
+        <div class="start-intro">
+          <p class="eyebrow">New case</p>
+          <h1 id="start-title">Open a new case</h1>
+          <p class="lead">Paste a public GitHub URL. Sherlock clones the repository, maps its code graph, and checks it for security, quality and dependency issues.</p>
+        </div>
 
-        <form id="analyze-form" class="analyze-form" novalidate>
-          <label for="repo-url-input">GitHub repository URL</label>
+        <form id="analyze-form" class="analyze-card" novalidate>
+          <label class="field-label" for="repo-url-input">GitHub repository URL</label>
           <div class="input-row">
             <input id="repo-url-input" type="url" inputmode="url" autocomplete="off"
                    placeholder="https://github.com/owner/repo" required>
             <button id="btn-analyze" class="btn btn-primary" type="submit">Analyze</button>
           </div>
+          <p class="analyze-help">Not sure what to try? <button class="link-btn" type="button" data-example>https://github.com/pallets/itsdangerous</button> is a small, public library.</p>
           <p id="analyze-error" class="form-error" role="alert" hidden></p>
         </form>
 
         <div class="start-grid">
-          <section aria-labelledby="repos-title">
-            <h2 id="repos-title">Your repositories</h2>
-            <ul id="repo-list" class="item-list"></ul>
-            <p id="repos-empty" class="text-muted hidden">No analyzed repositories yet.</p>
+          <section class="ledger" aria-labelledby="repos-title">
+            <header class="ledger-head">
+              <h2 id="repos-title">Your repositories</h2>
+            </header>
+            <ul id="repo-list" class="ruled-list"></ul>
+            <div id="repos-empty" class="empty-state hidden">
+              <p>No repositories analyzed yet.</p>
+              <p>Paste a GitHub URL above, or <button class="link-btn" type="button" data-example>start with the example</button>. The box fills in for you.</p>
+            </div>
           </section>
-          <section aria-labelledby="jobs-title">
-            <h2 id="jobs-title">Recent jobs</h2>
-            <ul id="job-list" class="item-list"></ul>
-            <p id="jobs-empty" class="text-muted hidden">No jobs yet.</p>
+          <section class="ledger" aria-labelledby="jobs-title">
+            <header class="ledger-head">
+              <h2 id="jobs-title">Recent jobs</h2>
+            </header>
+            <ul id="job-list" class="ruled-list activity-list"></ul>
+            <div id="jobs-empty" class="empty-state hidden">
+              <p>No analysis jobs yet.</p>
+              <p>Each analysis you start is listed here with its status.</p>
+            </div>
           </section>
         </div>
       </section>
 
       <!-- Progress -->
       <section id="view-progress" class="view hidden" aria-labelledby="progress-title">
-        <h1 id="progress-title">Analyzing repository</h1>
-        <p id="progress-url" class="text-muted break"></p>
-
-        <ol id="stage-stepper" class="stepper" aria-label="Analysis stages"></ol>
-
-        <div id="progress-track" class="progress-track" role="progressbar"
-             aria-label="Analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          <div id="progress-fill" class="progress-fill"></div>
+        <div class="progress-intro">
+          <p class="eyebrow">Analysis in progress</p>
+          <h1 id="progress-title">Analyzing repository</h1>
+          <p id="progress-url" class="mono repo-link break"></p>
         </div>
-        <p id="progress-status" class="text-muted" aria-live="polite"></p>
 
-        <div id="progress-error" class="form-error-box" hidden>
+        <div class="progress-meter">
+          <div id="progress-track" class="progress-track" role="progressbar"
+               aria-label="Analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+          <p id="progress-status" class="mono small text-muted" aria-live="polite"></p>
+        </div>
+
+        <ol id="stage-stepper" class="timeline" aria-label="Analysis stages"></ol>
+
+        <div id="progress-error" class="error-box" hidden>
           <p id="progress-error-text" role="alert"></p>
           <div class="button-row">
             <button id="btn-retry" class="btn btn-primary btn-sm" type="button">Retry</button>
@@ -87,14 +125,19 @@
       <!-- Repo workspace -->
       <section id="view-workspace" class="view hidden" aria-label="Repository workspace">
         <header class="repo-header">
-          <div class="repo-title">
-            <h1 id="repo-name"></h1>
-            <a id="repo-url" class="text-muted break" target="_blank" rel="noopener noreferrer" hidden></a>
+          <div class="repo-id">
+            <div class="repo-id-top">
+              <h1 id="repo-name"></h1>
+              <button id="btn-back-repos" class="btn btn-ghost btn-sm" type="button">&larr; All repositories</button>
+            </div>
+            <a id="repo-url" class="mono repo-link" target="_blank" rel="noopener noreferrer" hidden></a>
           </div>
-          <div class="repo-stats">
-            <span id="repo-score" class="score-pill" aria-live="polite"></span>
-            <ul id="severity-counts" class="severity-row" aria-label="Findings by severity"></ul>
-            <button id="btn-back-repos" class="btn btn-secondary btn-sm" type="button">All repositories</button>
+          <div class="repo-summary">
+            <p id="repo-score" class="score" aria-live="polite"></p>
+            <div class="sev-summary">
+              <div id="severity-bar" class="sev-bar" aria-hidden="true"></div>
+              <ul id="severity-counts" class="sev-legend" aria-label="Findings by severity"></ul>
+            </div>
           </div>
         </header>
 
@@ -105,16 +148,17 @@
                   aria-selected="false" aria-controls="panel-findings" tabindex="-1">Findings</button>
           <button id="tab-report" class="ws-tab hidden" type="button" role="tab" data-view="report"
                   aria-selected="false" aria-controls="panel-report" tabindex="-1">Report</button>
+          <span class="ws-tab-ink" aria-hidden="true"></span>
         </nav>
 
         <!-- Graph -->
         <div id="panel-graph" class="ws-panel" role="tabpanel" aria-labelledby="tab-graph">
           <div class="graph-toolbar">
-            <label class="grow">
+            <label class="toolbar-search">
               <span class="sr-only">Search nodes</span>
-              <input id="graph-search" type="search" placeholder="Search files, classes, functions..." autocomplete="off">
+              <input id="graph-search" type="search" placeholder="Search files, classes, functions" autocomplete="off">
             </label>
-            <label>
+            <label class="toolbar-select">
               <span class="sr-only">Layout</span>
               <select id="graph-layout">
                 <option value="cose">Force</option>
@@ -127,51 +171,50 @@
             <label class="check">
               <input id="filter-findings-only" type="checkbox"> Only nodes with findings
             </label>
+            <details id="graph-filters" class="filters">
+              <summary>Filters <span id="filters-count" class="count-pill" hidden></span></summary>
+              <div class="filters-body">
+                <fieldset class="filter-group">
+                  <legend>Node types</legend>
+                  <label class="check"><input type="checkbox" name="node-type" value="file" checked> File</label>
+                  <label class="check"><input type="checkbox" name="node-type" value="class" checked> Class</label>
+                  <label class="check"><input type="checkbox" name="node-type" value="function" checked> Function</label>
+                  <label class="check"><input type="checkbox" name="node-type" value="method" checked> Method</label>
+                  <label class="check"><input type="checkbox" name="node-type" value="external" checked> External</label>
+                  <label class="check"><input type="checkbox" name="node-type" value="other" checked> Other</label>
+                </fieldset>
+                <fieldset class="filter-group">
+                  <legend>Edges</legend>
+                  <label class="check"><input type="checkbox" name="edge-type" value="contains" checked> Contains</label>
+                  <label class="check"><input type="checkbox" name="edge-type" value="imports" checked> Imports</label>
+                  <label class="check"><input type="checkbox" name="edge-type" value="calls" checked> Calls</label>
+                </fieldset>
+              </div>
+            </details>
           </div>
-          <div class="graph-filters">
-            <fieldset class="filter-group">
-              <legend>Node types</legend>
-              <label class="check"><input type="checkbox" name="node-type" value="file" checked> File</label>
-              <label class="check"><input type="checkbox" name="node-type" value="class" checked> Class</label>
-              <label class="check"><input type="checkbox" name="node-type" value="function" checked> Function</label>
-              <label class="check"><input type="checkbox" name="node-type" value="method" checked> Method</label>
-              <label class="check"><input type="checkbox" name="node-type" value="external" checked> External</label>
-              <label class="check"><input type="checkbox" name="node-type" value="other" checked> Other</label>
-            </fieldset>
-            <fieldset class="filter-group">
-              <legend>Edges</legend>
-              <label class="check"><input type="checkbox" name="edge-type" value="contains" checked> Contains</label>
-              <label class="check"><input type="checkbox" name="edge-type" value="imports" checked> Imports</label>
-              <label class="check"><input type="checkbox" name="edge-type" value="calls" checked> Calls</label>
-            </fieldset>
-          </div>
-          <p id="graph-status" class="text-muted graph-status" role="status"></p>
+          <p id="graph-status" class="graph-status mono" role="status"></p>
 
           <div class="graph-body">
             <div class="graph-stage">
               <div id="graph-canvas" class="graph-canvas" role="img" aria-label="Interactive code graph. Use the search box and filters to narrow it down."></div>
-              <aside class="graph-legend" aria-label="Legend">
-                <h2 class="legend-title">Legend</h2>
+              <details class="graph-legend">
+                <summary>Legend</summary>
                 <ul>
-                  <li><span class="swatch swatch-good"></span> Healthy</li>
-                  <li><span class="swatch swatch-warn"></span> Needs attention</li>
-                  <li><span class="swatch swatch-bad"></span> At risk</li>
-                  <li><span class="shape shape-file"></span> File (rounded box)</li>
-                  <li><span class="shape shape-class"></span> Class (hexagon)</li>
-                  <li><span class="shape shape-function"></span> Function / method (circle)</li>
-                  <li><span class="shape shape-external"></span> External (diamond)</li>
-                  <li><span class="shape shape-other"></span> Other symbol (square)</li>
+                  <li><span class="mark mark-node"></span> No findings</li>
+                  <li><span class="mark mark-warn"></span> Needs attention</li>
+                  <li><span class="mark mark-bad"></span> At risk</li>
+                  <li><span class="mark mark-external"></span> External dependency</li>
                   <li><span class="line line-contains"></span> Contains</li>
                   <li><span class="line line-imports"></span> Imports</li>
                   <li><span class="line line-calls"></span> Calls</li>
                 </ul>
-                <p class="text-muted small">Size grows with lines of code and connections.</p>
-              </aside>
+                <p class="small text-muted">Size grows with code size and connections.</p>
+              </details>
             </div>
 
             <aside id="node-panel" class="node-panel hidden" aria-label="Node details">
               <div class="node-panel-header">
-                <span class="legend-title">Node details</span>
+                <span class="eyebrow">Node details</span>
                 <button id="btn-close-node" class="btn-close" type="button" aria-label="Close node details">&times;</button>
               </div>
               <div id="node-panel-content" class="node-panel-content"></div>
@@ -181,10 +224,10 @@
 
         <!-- Findings -->
         <div id="panel-findings" class="ws-panel hidden" role="tabpanel" aria-labelledby="tab-findings">
-          <div id="findings-summary" class="summary-cards"></div>
-          <div class="findings-actions">
-            <button id="btn-verify-all" class="btn btn-primary btn-sm" type="button" aria-describedby="verify-hint">Verify with AI</button>
-            <p id="verify-hint" class="text-muted small"></p>
+          <div id="findings-summary" class="findings-band"></div>
+          <div class="ai-row">
+            <button id="btn-verify-all" class="btn btn-secondary btn-sm" type="button" aria-describedby="verify-hint">Verify with AI</button>
+            <p id="verify-hint" class="verify-hint"></p>
           </div>
           <div class="findings-controls">
             <div class="filter-group">
@@ -202,7 +245,8 @@
               <span class="filter-label">Category</span>
               <div id="filter-category" class="chip-row"></div>
             </div>
-            <label class="sort-label">Sort by
+            <label class="sort-label">
+              <span class="filter-label">Sort</span>
               <select id="findings-sort">
                 <option value="severity">Severity</option>
                 <option value="file">File</option>
@@ -210,9 +254,9 @@
               </select>
             </label>
           </div>
-          <p id="findings-status" class="text-muted" role="status"></p>
+          <p id="findings-status" class="text-muted small" role="status"></p>
           <ul id="findings-list" class="findings-list"></ul>
-          <p id="findings-empty" class="text-muted hidden">No findings match these filters.</p>
+          <p id="findings-empty" class="empty-state hidden">No findings match these filters.</p>
         </div>
 
         <!-- Report (legacy 10-page analysis; only when the job has an analysis_id) -->
@@ -250,9 +294,7 @@
   <div id="code-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-filepath">
     <div class="modal-dialog">
       <div class="modal-header">
-        <div class="modal-title-wrap">
-          <span id="modal-filepath" class="modal-title">Source</span>
-        </div>
+        <span id="modal-filepath" class="mono modal-title">Source</span>
         <button id="btn-close-modal" class="btn-close" type="button" aria-label="Close source viewer">&times;</button>
       </div>
       <div class="modal-body">
@@ -265,24 +307,26 @@
   <div id="chat-widget" class="chat-widget hidden">
     <button id="chat-bubble" class="chat-bubble" type="button" title="Ask Sherlock"
             aria-label="Open repository chat" aria-expanded="false" aria-controls="chat-panel">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
       </svg>
     </button>
 
     <section id="chat-panel" class="chat-panel hidden" aria-label="Repository chat">
-      <div class="chat-header">
-        <div class="chat-header-left">
+      <header class="chat-header">
+        <div class="chat-title">
+          <span class="eyebrow">Ask Sherlock</span>
           <span id="chat-session-title">New chat</span>
         </div>
         <div class="chat-header-right">
           <button id="chat-new-chat" class="chat-btn-icon" type="button" title="New chat" aria-label="New chat">+</button>
           <button id="chat-close" class="chat-btn-icon" type="button" title="Close" aria-label="Close chat">&times;</button>
         </div>
-      </div>
+      </header>
 
       <div id="chat-focus" class="chat-focus hidden">
-        <span id="chat-focus-label"></span>
+        <span class="eyebrow">Scope</span>
+        <span id="chat-focus-label" class="mono"></span>
         <button id="chat-focus-clear" class="chat-btn-icon" type="button" aria-label="Remove focus">&times;</button>
       </div>
 
@@ -295,8 +339,10 @@
       <div class="chat-input-area">
         <div class="chat-input-wrapper">
           <label class="sr-only" for="chat-input">Your question</label>
-          <input id="chat-input" type="text" placeholder="Ask a question about the code..." autocomplete="off">
-          <button id="chat-send" class="chat-btn-send" type="button" title="Send" aria-label="Send">&#10148;</button>
+          <input id="chat-input" type="text" placeholder="Ask a question about the code" autocomplete="off">
+          <button id="chat-send" class="chat-btn-send" type="button" title="Send" aria-label="Send">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4"/></svg>
+          </button>
         </div>
         <div class="chat-status" id="chat-status" role="status"></div>
       </div>

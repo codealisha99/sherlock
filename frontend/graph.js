@@ -22,9 +22,23 @@ const graphEls = {
   fit: document.getElementById("btn-fit"),
   findingsOnly: document.getElementById("filter-findings-only"),
 };
+const filtersCountNode = document.getElementById("filters-count");
 
 let cyInstance = null;
 let graphStats = { total: 0, truncated: false };
+
+// Canvas colours mirror tokens.css (Cytoscape cannot read CSS variables). Colour means evidence:
+// nodes are neutral ink unless they carry findings; pen blue is for selection and imports only.
+const MARK = {
+  node: "#4a4e57",
+  warn: "#b97f0a",
+  bad: "#c2361f",
+  ink: "#15171c",
+  paper: "#f5f2ea",
+  pen: "#2a44c4",
+  contains: "#b6ad98",
+  calls: "#8a7f6c",
+};
 
 const GRAPH_STYLE = [
   {
@@ -33,48 +47,60 @@ const GRAPH_STYLE = [
       label: "data(label)",
       "font-size": 10,
       "font-family": "Inter, -apple-system, sans-serif",
-      color: "#2a2622",
+      color: MARK.ink,
       "text-valign": "bottom",
       "text-margin-y": 4,
       "text-wrap": "ellipsis",
       "text-max-width": 110,
       "min-zoomed-font-size": 8,
+      "text-background-color": MARK.paper,
+      "text-background-opacity": 0.85,
+      "text-background-padding": 2,
+      "text-background-shape": "roundrectangle",
       width: "data(size)",
       height: "data(size)",
-      "background-color": "#8a8175",
-      "border-width": 2,
-      "border-color": "#fffdf8",
+      "background-color": MARK.node,
+      "border-width": 1.5,
+      "border-color": MARK.paper,
     },
   },
   { selector: 'node[type = "file"]', style: { shape: "round-rectangle" } },
   { selector: 'node[type = "class"]', style: { shape: "hexagon" } },
   { selector: 'node[type = "function"], node[type = "method"]', style: { shape: "ellipse" } },
-  { selector: 'node[type = "external"]', style: { shape: "diamond", "background-color": "#a08fd0" } },
+  { selector: 'node[type = "external"]', style: {
+    shape: "diamond", "background-opacity": 0, "border-width": 1.5, "border-color": MARK.node,
+  } },
   { selector: 'node[type = "other"]', style: { shape: "rectangle" } },
-  { selector: 'node[health = "good"]', style: { "background-color": "#6f8f5e" } },
-  { selector: 'node[health = "warn"]', style: { "background-color": "#d9b45b" } },
-  { selector: 'node[health = "bad"]', style: { "background-color": "#b3543f" } },
+  { selector: 'node[health = "warn"]', style: { "background-color": MARK.warn } },
+  { selector: 'node[health = "bad"]', style: { "background-color": MARK.bad } },
   {
     selector: "edge",
     style: {
-      width: 1.5,
+      width: 1,
       "curve-style": "bezier",
-      "line-color": "#c9bfa9",
+      "line-color": MARK.contains,
       "target-arrow-shape": "none",
-      opacity: 0.85,
+      opacity: 0.9,
     },
   },
-  { selector: 'edge[type = "contains"]', style: { "line-style": "dotted" } },
+  { selector: 'edge[type = "contains"]', style: { "line-style": "dotted", opacity: 0.8 } },
   {
     selector: 'edge[type = "imports"]',
-    style: { "line-color": "#4e7fa6", "target-arrow-color": "#4e7fa6", "target-arrow-shape": "triangle" },
+    style: {
+      width: 1.2, "line-color": MARK.pen, "target-arrow-color": MARK.pen,
+      "target-arrow-shape": "triangle", opacity: 0.45,
+    },
   },
   {
     selector: 'edge[type = "calls"]',
-    style: { "line-color": "#cf8260", "target-arrow-color": "#cf8260", "target-arrow-shape": "triangle" },
+    style: {
+      width: 1.2, "line-color": MARK.calls, "target-arrow-color": MARK.calls,
+      "target-arrow-shape": "triangle", opacity: 0.8,
+    },
   },
-  { selector: ".match", style: { "border-width": 4, "border-color": "#b98a2f" } },
-  { selector: ":selected", style: { "border-width": 4, "border-color": "#2a2622" } },
+  { selector: ".match", style: { "overlay-color": MARK.pen, "overlay-opacity": 0.14, "overlay-padding": 6 } },
+  { selector: ":selected", style: { "border-width": 3, "border-color": MARK.pen, "overlay-color": MARK.pen, "overlay-opacity": 0.08, "overlay-padding": 4 } },
+  { selector: ".dimmed", style: { opacity: 0.16, "text-opacity": 0.3 } },
   { selector: ".filtered", style: { display: "none" } },
 ];
 
@@ -99,7 +125,8 @@ function sumFindings(findings) {
 
 function nodeSize(node, degree) {
   const loc = Number(node.metrics && node.metrics.loc) || 0;
-  return Math.round(18 + Math.min(40, Math.sqrt(loc) * 2 + degree * 2));
+  const fileBonus = normalizeNodeType(node.type) === "file" ? 6 : 0;
+  return Math.round(18 + fileBonus + Math.min(40, Math.sqrt(loc) * 2 + degree * 2));
 }
 
 /** Convert the contract graph JSON into Cytoscape elements. Drops edges with missing endpoints. */
@@ -166,6 +193,9 @@ function renderGraph(data) {
     maxZoom: 3,
   });
   cyInstance.on("tap", "node", (evt) => selectGraphNode(evt.target.id()));
+  cyInstance.on("tap", (evt) => {
+    if (evt.target === cyInstance) clearGraphSelection();
+  });
   graphStats = { total: data.nodes.length, truncated: Boolean(data.stats && data.stats.truncated) };
   applyGraphFilters();
 }
@@ -195,6 +225,7 @@ function checkedValues(name) {
 
 /** Hides nodes/edges that fail the type, edge-type, or findings-only filters. */
 function applyGraphFilters() {
+  updateFilterCount();
   if (!cyInstance) return;
   const nodeTypes = new Set(checkedValues("node-type"));
   const edgeTypes = new Set(checkedValues("edge-type"));
@@ -215,6 +246,13 @@ function applyGraphFilters() {
   const shown = cyInstance.nodes().not(".filtered").length;
   const truncated = graphStats.truncated ? " Graph truncated by the server limit." : "";
   setStatus(graphEls.status, `${shown} of ${graphStats.total} nodes shown.${truncated}`);
+}
+
+/** Badge on the Filters disclosure: how many node/edge types are hidden. */
+function updateFilterCount() {
+  const hidden = document.querySelectorAll('input[name="node-type"]:not(:checked), input[name="edge-type"]:not(:checked)').length;
+  filtersCountNode.textContent = String(hidden);
+  filtersCountNode.hidden = hidden === 0;
 }
 
 function resetGraphFilters() {
@@ -256,11 +294,30 @@ function selectGraphNode(nodeId) {
   if (node.hasClass("filtered")) resetGraphFilters();
   cyInstance.elements().unselect();
   node.select();
+  focusNeighbourhood(node);
   cyInstance.animate({ center: { eles: node } }, { duration: 250 });
+}
+
+/** Dims everything outside the node's immediate neighbourhood (reversed by clearGraphSelection). */
+function focusNeighbourhood(node) {
+  cyInstance.batch(() => {
+    cyInstance.elements().removeClass("dimmed");
+    cyInstance.elements().not(node.closedNeighborhood()).addClass("dimmed");
+  });
+}
+
+/** Clears selection and dimming. Called when the node panel closes and on background tap. */
+function clearGraphSelection() {
+  if (!cyInstance) return;
+  cyInstance.batch(() => {
+    cyInstance.elements().unselect();
+    cyInstance.elements().removeClass("dimmed");
+  });
 }
 
 function fitGraph() {
   if (!cyInstance) return;
+  cyInstance.resize();
   cyInstance.fit(cyInstance.elements().not(".filtered"), 40);
 }
 

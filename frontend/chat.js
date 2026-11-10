@@ -53,7 +53,10 @@ function initChat() {
     if (chatEls.panel.classList.contains("hidden")) openChatPanel();
     else closeChatPanel();
   });
-  chatEls.close.addEventListener("click", closeChatPanel);
+  chatEls.close.addEventListener("click", () => {
+    closeChatPanel();
+    chatEls.bubble.focus();
+  });
   chatEls.newChat.addEventListener("click", startNewChat);
   chatEls.send.addEventListener("click", sendMessage);
   chatEls.focusClear.addEventListener("click", () => setFocus(null));
@@ -64,7 +67,9 @@ function initChat() {
     }
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !chatEls.panel.classList.contains("hidden")) closeChatPanel();
+    if (e.key !== "Escape" || chatEls.panel.classList.contains("hidden")) return;
+    closeChatPanel();
+    chatEls.bubble.focus(); // Esc returns focus to the bubble that opened the chat
   });
   renderEmptyHint();
   renderModelBanner();

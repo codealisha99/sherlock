@@ -78,6 +78,36 @@ function severityBadge(severity) {
   return el("span", { className: `sev-badge sev-${level}`, text: level });
 }
 
+/** Stacked severity bar segments (flex-grow proportional to count). Empty when there are no findings. */
+function severitySegments(bySeverity) {
+  return SEVERITY_ORDER.filter((sev) => Number(bySeverity[sev]) > 0).map((sev) => {
+    const seg = el("span", { className: `sev-seg sev-${sev}-seg`, title: `${bySeverity[sev]} ${sev}` });
+    seg.style.flexGrow = String(Number(bySeverity[sev]));
+    return seg;
+  });
+}
+
+/** Legend items: colour dot, count, severity name. */
+function severityLegendItems(bySeverity) {
+  return SEVERITY_ORDER.filter((sev) => Number(bySeverity[sev]) > 0).map((sev) => el(
+    "li",
+    {},
+    el("span", { className: `sev-dot sev-${sev}-seg`, "aria-hidden": "true" }),
+    el("span", { className: "sev-count", text: String(bySeverity[sev]) }),
+    el("span", { text: sev }),
+  ));
+}
+
+const FOCUSABLE_SELECTOR = [
+  "a[href]", "button:not([disabled])", "input:not([disabled])", "select:not([disabled])",
+  "textarea:not([disabled])", '[tabindex]:not([tabindex="-1"])',
+].join(", ");
+
+/** Visible, enabled focusable descendants of root, in DOM order (for focus trapping). */
+function focusableIn(root) {
+  return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR)).filter((node) => node.getClientRects().length > 0);
+}
+
 function healthLabel(health) {
   return { good: "Healthy", warn: "Needs attention", bad: "At risk" }[health] || "Unrated";
 }
