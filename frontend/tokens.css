@@ -1,0 +1,103 @@
+/* Sherlock design tokens: the single source of truth for site.css (landing, auth,
+ * settings) and style.css (workspace). Direction "Case File": ink on paper,
+ * one pen-blue accent, colour reserved for evidence (severity). See docs/DESIGN.md. */
+:root {
+  /* Primaries: ink + paper */
+  --ink: #15171c;
+  --ink-2: #2b2e36;
+  --paper: #f5f2ea;
+  --surface: #fffdf8;
+  --surface-2: #efebe1;
+  --surface-sunk: #ebe6da;
+
+  /* Accent: fountain-pen blue. Interactive things only (links, primary actions, focus, selection). */
+  --pen: #2a44c4;
+  --pen-strong: #1f339c;
+  --pen-soft: #e7eafa;
+
+  /* Lines (prefer rules over shadows) */
+  --line: #e2dccf;
+  --line-strong: #cbc2ae;
+  --line-control: #8f8672; /* input/checkbox boundaries, 3:1 (WCAG 1.4.11) */
+
+  /* Text */
+  --text: #15171c;
+  --text-2: #55524a;
+  --text-3: #69645a; /* >=4.5:1 on paper and surface-2 */
+  --text-on-ink: #f5f2ea;
+
+  /* Evidence (semantic). Never used decoratively. Text variants meet 4.5:1 on their -bg. */
+  --sev-critical: #a3161b;
+  --sev-critical-bg: #fbe5e3;
+  --sev-high: #b3400a;
+  --sev-high-bg: #fcebdf;
+  --sev-medium: #8a5a00;
+  --sev-medium-bg: #faefd6;
+  --sev-low: #34557d;
+  --sev-low-bg: #e5edf6;
+  --sev-info: #5d5a52;
+  --sev-info-bg: #ece8de;
+  --ok: #2b6e45;
+  --ok-bg: #e2f0e6;
+  --warn: var(--sev-medium);
+  --warn-bg: var(--sev-medium-bg);
+  --err: var(--sev-critical);
+  --err-bg: var(--sev-critical-bg);
+
+  /* Graph marks (canvas colours mirrored in graph.js) */
+  --mark-node: #4a4e57;
+  --mark-warn: #b97f0a;
+  --mark-bad: #c2361f;
+
+  /* Type */
+  --font-display: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --fs-display: clamp(2.6rem, 1.6rem + 4.2vw, 4.75rem);
+  --fs-h1: clamp(1.9rem, 1.5rem + 1.6vw, 2.6rem);
+  --fs-h2: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  --fs-h3: 1.2rem;
+  --fs-body: 1rem;
+  --fs-small: 0.875rem;
+  --fs-label: 0.72rem; /* mono, uppercase, tracked */
+
+  /* Space (4px base) */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px;
+  --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px; --s-10: 128px;
+
+  /* Shape */
+  --r-1: 4px;  /* chips, badges */
+  --r-2: 8px;  /* controls, buttons */
+  --r-3: 12px; /* cards, panels */
+  --shadow-1: 0 1px 0 rgba(21, 23, 28, 0.04);
+  --shadow-2: 0 1px 2px rgba(21, 23, 28, 0.06), 0 8px 24px rgba(21, 23, 28, 0.08);
+  --shadow-3: 0 2px 6px rgba(21, 23, 28, 0.08), 0 24px 56px rgba(21, 23, 28, 0.16);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-1: 120ms; /* press, hover */
+  --dur-2: 200ms; /* menus, tabs, chips */
+  --dur-3: 320ms; /* panels, dialogs, sheets */
+  --dur-4: 520ms; /* section reveals */
+  --stagger: 45ms;
+
+  /* Layout */
+  --container: 1180px;
+  --topbar-h: 56px;
+  /* Breakpoints (documented; CSS vars can't be used in media queries):
+     sm 640 · md 900 · lg 1200 */
+
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--pen);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-1: 0ms; --dur-2: 0ms; --dur-3: 0ms; --dur-4: 0ms; --stagger: 0ms; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
