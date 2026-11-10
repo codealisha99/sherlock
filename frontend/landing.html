@@ -49,7 +49,7 @@
         <div>
           <p class="eyebrow">Codebase intelligence</p>
           <h1 id="hero-title">Read a codebase like a <em>detective</em> reads a case file.</h1>
-          <p class="lead">Paste a GitHub repository. Sherlock builds an AST graph and vector embeddings, scans for vulnerabilities and code-quality hotspots, and lets you ask questions about any file, function or class.</p>
+          <p class="lead">Paste a GitHub repository. Sherlock builds a code graph and vector embeddings, scans for vulnerabilities and code-quality hotspots, checks dependencies against the OSV vulnerability database, and lets you ask questions about any file, function or class.</p>
 
           <form class="repo-form" id="repo-form" novalidate>
             <div class="repo-form-row">
@@ -126,17 +126,17 @@
           <li class="step">
             <span class="step-num" aria-hidden="true">2</span>
             <h3>Build the graph</h3>
-            <p>Files, classes, functions and imports become an AST graph. Code chunks get vector embeddings for search.</p>
+            <p>Files, classes, functions, methods and imports become a code graph for Python, JavaScript, TypeScript, Go, Java, Rust and Ruby. Code chunks get vector embeddings for search.</p>
           </li>
           <li class="step">
             <span class="step-num" aria-hidden="true">3</span>
             <h3>Scan the code</h3>
-            <p>Security rules, secret detection, dependency hygiene and quality metrics such as complexity and test gaps.</p>
+            <p>Security rules, secret detection, dependency checks against the OSV database, and quality metrics such as complexity and test gaps.</p>
           </li>
           <li class="step">
             <span class="step-num" aria-hidden="true">4</span>
-            <h3>Explore and ask</h3>
-            <p>Click any node to see its findings and source. Chat with the repository, scoped to that node, with citations.</p>
+            <h3>Explore, verify and ask</h3>
+            <p>Click any node to see its findings and source. Have a model verify findings, and chat with the repository, scoped to that node, with citations.</p>
           </li>
         </ol>
       </div>
@@ -164,6 +164,21 @@
             <span class="tag tag-butter">Quality</span>
             <h3>Lagging-code hotspots</h3>
             <p>See where complexity, file size and missing tests concentrate. Hotspots show up on the graph, not buried in a report.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag-sky">Dependencies</span>
+            <h3>Dependency CVE checks</h3>
+            <p>Versions pinned in your manifests and lockfiles are checked against the OSV.dev vulnerability database. Each finding lists its advisory IDs and the fixed version when one is known.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag-lavender">Verify</span>
+            <h3>AI verification of findings</h3>
+            <p>A model gives each checked finding a verdict (confirmed, likely, false positive or uncertain), a confidence score, an explanation and a suggested fix. Use your own key, or the platform model within your plan's limits.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag-butter">Languages</span>
+            <h3>Python, JavaScript/TypeScript, Go, Java, Rust, Ruby</h3>
+            <p>Classes, functions, methods, imports and simple call relationships appear in the graph for each supported language, with the same filters, search and node details.</p>
           </article>
           <article class="card">
             <span class="tag tag-lavender">Chat</span>
@@ -232,19 +247,19 @@
           </details>
           <details>
             <summary>Which languages are supported?</summary>
-            <p>Python gets full AST analysis. JavaScript and TypeScript get import extraction and pattern-based rules. Other languages are covered by text-based rules and show up in the file-level graph and search.</p>
+            <p>Python is parsed with the standard library AST. JavaScript, TypeScript, Go, Java, Rust and Ruby are parsed with tree-sitter to extract classes, functions, methods, imports and simple calls, with pattern matching as a fallback. Dependency checks cover the manifests and lockfiles Sherlock recognizes.</p>
           </details>
           <details>
             <summary>Do I need my own API key?</summary>
-            <p>No. Without a key, chat uses the platform model. If you add a key, your requests use it instead and count against your provider account, not our quota.</p>
+            <p>No. Without a key, chat and AI verification use the platform model when one is configured. If you add a key, your requests use it instead and count against your provider account, not our quota.</p>
           </details>
           <details>
             <summary>When is my code sent to a model?</summary>
-            <p>Repository analysis runs on Sherlock's servers. Code is sent to a model provider only when you ask a chat question, and then only the context retrieved for that question is included, fenced as untrusted data.</p>
+            <p>Repository analysis runs on Sherlock's servers and does not call a model. Code is sent to a model provider only when you ask a chat question or verify a finding, and then only the context for that question or finding is included, fenced as untrusted data.</p>
           </details>
           <details>
             <summary>What counts toward my limits?</summary>
-            <p>Each repository analysis counts once toward the monthly analysis limit. Each question you send in chat counts toward the daily chat limit. Limits and usage are shown in Settings.</p>
+            <p>Each repository analysis counts once toward the monthly analysis limit. Each question you send in chat, and each finding verified with AI, counts toward the daily chat limit. Limits and usage are shown in Settings.</p>
           </details>
           <details>
             <summary>How do I upgrade or cancel?</summary>

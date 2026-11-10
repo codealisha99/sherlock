@@ -1,6 +1,7 @@
 /**
- * Right-side node detail panel: metrics, findings, neighbors, source, and "Ask about this".
- * Requires util.js, api.js, graph.js (selectGraphNode), chat.js (openChatWithFocus).
+ * Right-side node detail panel (a bottom sheet on narrow screens): metrics, findings with
+ * triage verdicts, neighbors, source, "Ask about this", and "Verify with AI" for the node.
+ * Requires util.js, api.js, ai.js, finding-view.js, graph.js (selectGraphNode), chat.js (openChatWithFocus).
  */
 
 const nodePanelEls = {
@@ -9,8 +10,11 @@ const nodePanelEls = {
   close: document.getElementById("btn-close-node"),
 };
 
+const SHEET_QUERY = window.matchMedia("(max-width: 900px)");
+
 // Sequence number so a slow response for an earlier click never overwrites a newer one.
 let nodeRequestSeq = 0;
+let currentNodeId = null;
 
 function initNodePanel() {
   nodePanelEls.close.addEventListener("click", closeNodePanel);
@@ -21,24 +25,33 @@ function initNodePanel() {
 
 function closeNodePanel() {
   nodeRequestSeq += 1;
+  currentNodeId = null;
   nodePanelEls.panel.classList.add("hidden");
   nodePanelEls.content.replaceChildren();
 }
 
 async function openNodePanel(nodeId) {
   const seq = ++nodeRequestSeq;
+  currentNodeId = nodeId;
   nodePanelEls.panel.classList.remove("hidden");
   nodePanelEls.content.replaceChildren(el("p", { className: "text-muted", text: "Loading node..." }));
   try {
     const detail = await API.node(workspaceState.repoId, nodeId);
     if (seq !== nodeRequestSeq) return;
     nodePanelEls.content.replaceChildren(renderNodeDetail(detail));
+    // On narrow screens the sheet overlays the graph, so move focus into it.
+    if (SHEET_QUERY.matches) nodePanelEls.close.focus({ preventScroll: true });
   } catch (err) {
     if (seq !== nodeRequestSeq) return;
     nodePanelEls.content.replaceChildren(
       el("p", { className: "form-error", role: "alert", text: `Could not load this node: ${err.message}` }),
     );
   }
+}
+
+/** Re-renders the open node after a triage run so verdict badges stay current. */
+function refreshOpenNodePanel() {
+  if (currentNodeId && !nodePanelEls.panel.classList.contains("hidden")) openNodePanel(currentNodeId);
 }
 
 function humanize(key) {
@@ -61,7 +74,7 @@ function renderNodeDetail(detail) {
       { className: "node-tags" },
       el("span", { className: "badge badge-subtle", text: node.type || "node" }),
       el("span", { className: `health-tag health-${node.health || "none"}`, text: healthLabel(node.health) }),
-      node.language ? el("span", { className: "badge badge-subtle", text: node.language }) : null,
+      node.language ? el("span", { className: "badge badge-subtle", text: `Language: ${node.language}` }) : null,
     ),
     location ? el("p", { className: "node-path", text: location }) : null,
     renderMetrics(node.metrics || {}),
@@ -100,6 +113,26 @@ function renderMetrics(metrics) {
   );
 }
 
+/** "Verify with AI" for this node's findings that have no verdict yet. */
+function nodeVerifyControls(findings) {
+  const pending = findings.filter((f) => f.id && !f.triage).map((f) => f.id);
+  const available = aiAvailable();
+  const label = pending.length ? `Verify with AI (${pending.length})` : "Nothing new to verify";
+  return el(
+    "div",
+    { className: "node-verify" },
+    el("button", {
+      className: "btn btn-secondary btn-sm",
+      type: "button",
+      text: label,
+      disabled: !available || !pending.length,
+      title: available ? undefined : AI_UNAVAILABLE_TITLE,
+      on: { click: (e) => verifyFindingIds(pending, e.currentTarget) },
+    }),
+    available ? null : el("p", { className: "small text-muted" }, aiUnavailableNodes()),
+  );
+}
+
 function renderNodeFindings(findings) {
   const heading = el("h3", { text: `Findings (${findings.length})` });
   if (!findings.length) {
@@ -109,6 +142,7 @@ function renderNodeFindings(findings) {
     "section",
     { className: "node-section" },
     heading,
+    nodeVerifyControls(findings),
     el("ul", { className: "finding-stack" }, findings.map((f) => el(
       "li",
       { className: "finding-item" },
@@ -118,10 +152,13 @@ function renderNodeFindings(findings) {
         severityBadge(f.severity),
         el("strong", { text: f.title || f.rule_id || "Finding" }),
         f.cwe ? el("span", { className: "cwe-tag", text: f.cwe }) : null,
+        triageBadge(f),
       ),
       f.line ? el("p", { className: "text-muted", text: `Line ${f.line}` }) : null,
       f.description ? el("p", { text: f.description }) : null,
       f.recommendation ? el("p", { className: "finding-fix" }, el("strong", { text: "Fix: " }), f.recommendation) : null,
+      dependencyDetails(f),
+      triageDetails(f),
     ))),
   );
 }

@@ -58,4 +58,7 @@ const API = {
   report: (analysisId) => apiGet(`/api/analysis/${seg(analysisId)}/report`),
   file: (analysisId, path) => apiGet(`/api/analysis/${seg(analysisId)}/file?path=${encodeURIComponent(path)}`),
   createChatSession: (repoId) => apiPost("/api/chat/sessions", { repo_id: repoId }),
+  capabilities: () => apiGet("/api/capabilities"),
+  /** body undefined = server default selection of findings to verify. */
+  triage: (repoId, body) => apiPost(`/api/repos/${seg(repoId)}/triage`, body),
 };

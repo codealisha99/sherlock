@@ -136,6 +136,7 @@
               <label class="check"><input type="checkbox" name="node-type" value="function" checked> Function</label>
               <label class="check"><input type="checkbox" name="node-type" value="method" checked> Method</label>
               <label class="check"><input type="checkbox" name="node-type" value="external" checked> External</label>
+              <label class="check"><input type="checkbox" name="node-type" value="other" checked> Other</label>
             </fieldset>
             <fieldset class="filter-group">
               <legend>Edges</legend>
@@ -159,6 +160,7 @@
                   <li><span class="shape shape-class"></span> Class (hexagon)</li>
                   <li><span class="shape shape-function"></span> Function / method (circle)</li>
                   <li><span class="shape shape-external"></span> External (diamond)</li>
+                  <li><span class="shape shape-other"></span> Other symbol (square)</li>
                   <li><span class="line line-contains"></span> Contains</li>
                   <li><span class="line line-imports"></span> Imports</li>
                   <li><span class="line line-calls"></span> Calls</li>
@@ -180,7 +182,18 @@
         <!-- Findings -->
         <div id="panel-findings" class="ws-panel hidden" role="tabpanel" aria-labelledby="tab-findings">
           <div id="findings-summary" class="summary-cards"></div>
+          <div class="findings-actions">
+            <button id="btn-verify-all" class="btn btn-primary btn-sm" type="button" aria-describedby="verify-hint">Verify with AI</button>
+            <p id="verify-hint" class="text-muted small"></p>
+          </div>
           <div class="findings-controls">
+            <div class="filter-group">
+              <span class="filter-label">Triage</span>
+              <div class="chip-row">
+                <button id="filter-hide-fp" class="chip" type="button" aria-pressed="true">Hide false positives</button>
+                <button id="filter-hide-lowconf" class="chip" type="button" aria-pressed="false">Hide low confidence</button>
+              </div>
+            </div>
             <div class="filter-group">
               <span class="filter-label">Severity</span>
               <div id="filter-severity" class="chip-row"></div>
@@ -273,6 +286,8 @@
         <button id="chat-focus-clear" class="chat-btn-icon" type="button" aria-label="Remove focus">&times;</button>
       </div>
 
+      <p id="chat-model-banner" class="chat-banner" hidden>Chat needs an AI model. <a href="/settings#keys">Add your API key</a> to use it.</p>
+
       <div id="chat-messages" class="chat-messages" role="log" aria-live="polite">
         <div class="chat-empty"><p>Ask anything about this repository.</p></div>
       </div>
@@ -288,10 +303,14 @@
     </section>
   </div>
 
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
   <script src="https://cdn.jsdelivr.net/npm/cytoscape@3/dist/cytoscape.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script src="/util.js"></script>
   <script src="/api.js"></script>
+  <script src="/ai.js"></script>
+  <script src="/finding-view.js"></script>
   <script src="/node-panel.js"></script>
   <script src="/graph.js"></script>
   <script src="/findings.js"></script>

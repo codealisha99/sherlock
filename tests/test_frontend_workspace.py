@@ -14,7 +14,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
 
-WORKSPACE_JS = ["util.js", "api.js", "node-panel.js", "graph.js", "findings.js", "chat.js", "report.js", "app.js"]
+WORKSPACE_JS = [
+    "util.js", "api.js", "ai.js", "finding-view.js", "node-panel.js", "graph.js",
+    "findings.js", "chat.js", "report.js", "app.js",
+]
 MAX_JS_LINES = 600
 
 INLINE_SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc=)[^>]*>", re.IGNORECASE)
@@ -75,6 +78,9 @@ class TestWorkspaceHtml(unittest.TestCase):
             # findings
             "findings-summary", "filter-severity", "filter-category", "findings-sort",
             "findings-list", "findings-empty", "findings-status",
+            # v2: AI verification + triage filters
+            "btn-verify-all", "verify-hint", "filter-hide-fp", "filter-hide-lowconf",
+            "chat-model-banner", "toast",
             # report
             "report-body", "report-title", "report-subtitle", "report-indicator", "report-prev",
             "report-next", "report-tabs", "code-modal", "modal-filepath", "modal-code-content",
@@ -136,8 +142,8 @@ class TestWorkspaceJsContract(unittest.TestCase):
         self.assertIn("/api/chat/sessions/${seg(sessionId)}/messages", chat)
         self.assertIn("body.focus = chatState.focus", chat)
         self.assertIn('"data:"', chat)
-        for event_type in ("token", "status", "done", "error"):
-            self.assertIn(f'event.type === "{event_type}"', chat)
+        for event_type in ("token", "status", "done", "error", "progress"):
+            self.assertIn(f'case "{event_type}":', chat)
 
     def test_chat_handles_limit_statuses(self):
         chat = self.sources["chat.js"] + self.sources["app.js"]
@@ -187,6 +193,100 @@ class TestWorkspaceJsContract(unittest.TestCase):
         for name, src in self.sources.items():
             with self.subTest(file=name):
                 self.assertLess(len(src.splitlines()), MAX_JS_LINES, f"{name} exceeds {MAX_JS_LINES} lines")
+
+
+class TestWorkspaceV2(unittest.TestCase):
+    """v2: AI verification, dependency findings, multi-language graph, chat errors, mobile layout."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sources = {name: _read(name) for name in WORKSPACE_JS}
+        cls.css = _read("style.css")
+        cls.index = _read("index.html")
+
+    def test_capabilities_and_triage_endpoints(self):
+        api = self.sources["api.js"]
+        self.assertIn('"/api/capabilities"', api)
+        self.assertIn("/triage`", api)
+
+    def test_auditing_stage_between_scanning_and_graphing(self):
+        app = self.sources["app.js"]
+        match = re.search(r"const STAGES = \[([^\]]*)\]", app)
+        self.assertIsNotNone(match, "STAGES list not found")
+        stages = [s.strip().strip('"') for s in match.group(1).split(",")]
+        self.assertIn("auditing", stages)
+        self.assertLess(stages.index("scanning"), stages.index("auditing"))
+        self.assertLess(stages.index("auditing"), stages.index("graphing"))
+        self.assertIn('auditing: "Checking dependencies"', app)
+
+    def test_https_only_link_guard(self):
+        util = self.sources["util.js"]
+        self.assertIn("function safeExternalLink", util)
+        self.assertIn('url.protocol === "https:"', util)
+        finding_view = self.sources["finding-view.js"]
+        self.assertIn("safeExternalLink(", finding_view)
+        self.assertIn('rel: "noopener noreferrer"', finding_view)
+        self.assertIn('target: "_blank"', finding_view)
+        # Every external anchor is built from a validated href.
+        self.assertNotIn('href: ref', finding_view)
+        self.assertIn("safeExternalLink(", self.sources["app.js"])
+
+    def test_ai_gating_and_triage_errors(self):
+        ai = self.sources["ai.js"]
+        for token in ("platform_model", "byok", "finding_ids", "/settings#keys", "402", "409", "429"):
+            with self.subTest(token=token):
+                self.assertIn(token, ai)
+        self.assertIn("disabled: !available", self.sources["finding-view.js"] + ai + self.sources["node-panel.js"])
+
+    def test_chat_stream_errors_and_no_model(self):
+        chat = self.sources["chat.js"]
+        self.assertIn('"no_model"', chat)
+        self.assertIn('"/settings#keys"', chat)
+        self.assertIn('"progress"', chat)
+        self.assertIn("abstention_reason", chat)
+        self.assertIn("throw new ApiError(0", chat)
+        self.assertIn("err instanceof ApiError ? err.message", chat)
+        self.assertIn("finally {\n    setStreaming(false);", chat)
+
+    def test_graph_handles_any_symbol_type(self):
+        graph = self.sources["graph.js"]
+        self.assertIn("function normalizeNodeType", graph)
+        self.assertIn('"other"', graph)
+        self.assertIn('value="other"', self.index)
+        self.assertNotIn("Python", graph, "graph.js must not assume Python")
+
+    def test_repo_level_findings_never_select_empty_node(self):
+        graph = self.sources["graph.js"]
+        findings = self.sources["findings.js"]
+        self.assertIn("isSelectableNodeId(nodeId)", graph)
+        self.assertIn("(file|sym|ext):.+", graph)
+        self.assertIn("function findingTarget", findings)
+        self.assertIn("finding-row-static", findings)
+
+    def test_triage_filters_default_state(self):
+        findings = self.sources["findings.js"]
+        self.assertIn("hideFalsePositives: true", findings)
+        self.assertIn("hideLowConfidence: false", findings)
+
+    def test_mobile_top_bar_and_bottom_sheet_css(self):
+        self.assertIn("@media (max-width: 420px)", self.css)
+        self.assertIn("#plan-badge { display: none; }", self.css)
+        self.assertRegex(
+            self.css,
+            r"\.node-panel \{\s*position: fixed; left: 0; right: 0; bottom: 0;",
+            "node panel must become a fixed bottom sheet on narrow screens",
+        )
+
+    def test_node_panel_moves_focus_when_sheet(self):
+        panel = self.sources["node-panel.js"]
+        self.assertIn("max-width: 900px", panel)
+        self.assertIn("close.focus(", panel)
+
+    def test_no_inline_handlers_in_v2_modules(self):
+        for name in ("ai.js", "finding-view.js"):
+            with self.subTest(file=name):
+                self.assertNotIn("onclick", self.sources[name])
+                self.assertNotIn("innerHTML", self.sources[name])
 
 
 class TestWorkspaceJsParse(unittest.TestCase):

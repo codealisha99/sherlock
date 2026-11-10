@@ -52,6 +52,27 @@ function setStatus(node, message) {
   if (node) node.textContent = message || "";
 }
 
+/** Returns the normalized URL only when it parses as https; "" otherwise. Every external link goes through this. */
+function safeExternalLink(raw) {
+  try {
+    const url = new URL(String(raw || ""));
+    return url.protocol === "https:" ? url.href : "";
+  } catch (_err) {
+    return "";
+  }
+}
+
+const toastNode = document.getElementById("toast");
+let toastTimer = null;
+
+/** Shows a transient message. content: string or array of nodes; tone: "ok" | "error". */
+function showToast(content, tone = "ok") {
+  clearTimeout(toastTimer);
+  toastNode.className = `toast toast-${tone}`;
+  toastNode.replaceChildren(...(Array.isArray(content) ? content : [content]));
+  toastTimer = setTimeout(() => toastNode.classList.add("hidden"), 7000);
+}
+
 function severityBadge(severity) {
   const level = SEVERITY_ORDER.includes(severity) ? severity : "info";
   return el("span", { className: `sev-badge sev-${level}`, text: level });

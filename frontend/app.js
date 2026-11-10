@@ -1,16 +1,17 @@
 /**
  * Sherlock workspace (/app): auth gate, start screen, job progress, repo workspace shell.
- * Load order (index.html): util.js, api.js, node-panel.js, graph.js, findings.js,
- * chat.js, report.js, app.js. Every module exposes init* functions called from boot().
+ * Load order (index.html): util.js, api.js, ai.js, finding-view.js, node-panel.js, graph.js,
+ * findings.js, chat.js, report.js, app.js. Every module exposes init* functions called from boot().
  */
 
 const POLL_INTERVAL_MS = 1500;
-const STAGES = ["cloning", "indexing", "embedding", "scanning", "graphing", "done"];
+const STAGES = ["cloning", "indexing", "embedding", "scanning", "auditing", "graphing", "done"];
 const STAGE_LABELS = {
   cloning: "Cloning",
   indexing: "Indexing",
   embedding: "Embedding",
   scanning: "Scanning",
+  auditing: "Checking dependencies",
   graphing: "Graphing",
   done: "Done",
 };
@@ -120,6 +121,7 @@ async function checkSession() {
   appEls.urlInput.value = currentRepoParam();
   showView("start");
   loadStartLists();
+  loadCapabilities().then(refreshAiControls);
 }
 
 function renderUser(user) {
@@ -387,8 +389,10 @@ function backToStart() {
 // Repo workspace
 // ---------------------------------------------------------------------------
 
+/** Only validated https links to github.com are rendered as the repo link. */
 function safeGithubLink(url) {
-  return /^https:\/\/github\.com\//.test(url || "") ? url : "";
+  const safe = safeExternalLink(url);
+  return safe.startsWith("https://github.com/") ? safe : "";
 }
 
 async function openRepo({ id, name, analysisId }) {

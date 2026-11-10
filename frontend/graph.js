@@ -4,8 +4,14 @@
  * Requires util.js, api.js, node-panel.js (openNodePanel), and the cytoscape CDN script.
  */
 
-const NODE_TYPES = ["file", "class", "function", "method", "external"];
+const NODE_TYPES = ["file", "class", "function", "method", "external", "other"];
+const KNOWN_EDGE_TYPES = ["contains", "imports", "calls"];
 const LARGE_GRAPH_THRESHOLD = 400;
+
+/** Node types outside the filter list (e.g. symbols from other languages) are shown as "other", never hidden. */
+function normalizeNodeType(type) {
+  return NODE_TYPES.includes(type) ? type : "other";
+}
 
 const graphEls = {
   canvas: document.getElementById("graph-canvas"),
@@ -44,6 +50,7 @@ const GRAPH_STYLE = [
   { selector: 'node[type = "class"]', style: { shape: "hexagon" } },
   { selector: 'node[type = "function"], node[type = "method"]', style: { shape: "ellipse" } },
   { selector: 'node[type = "external"]', style: { shape: "diamond", "background-color": "#a08fd0" } },
+  { selector: 'node[type = "other"]', style: { shape: "rectangle" } },
   { selector: 'node[health = "good"]', style: { "background-color": "#6f8f5e" } },
   { selector: 'node[health = "warn"]', style: { "background-color": "#d9b45b" } },
   { selector: 'node[health = "bad"]', style: { "background-color": "#b3543f" } },
@@ -109,7 +116,8 @@ function buildGraphElements(data) {
     data: {
       id: n.id,
       label: n.label || n.id,
-      type: n.type,
+      type: normalizeNodeType(n.type),
+      language: n.language || "",
       health: n.health || "none",
       findingsTotal: sumFindings(n.findings),
       size: nodeSize(n, degree.get(n.id) || 0),
@@ -154,7 +162,6 @@ function renderGraph(data) {
     elements,
     style: GRAPH_STYLE,
     layout: layoutOptions(graphEls.layout.value, large),
-    wheelSensitivity: 0.3,
     minZoom: 0.1,
     maxZoom: 3,
   });
@@ -198,7 +205,8 @@ function applyGraphFilters() {
       n.toggleClass("filtered", !visible);
     });
     cyInstance.edges().forEach((e) => {
-      const visible = edgeTypes.has(e.data("type"))
+      const type = e.data("type");
+      const visible = (!KNOWN_EDGE_TYPES.includes(type) || edgeTypes.has(type))
         && !e.source().hasClass("filtered")
         && !e.target().hasClass("filtered");
       e.toggleClass("filtered", !visible);
@@ -233,8 +241,14 @@ function searchGraph(query) {
   setStatus(graphEls.status, matches.length ? `${matches.length} match${matches.length === 1 ? "" : "es"}.` : "No matching nodes.");
 }
 
+/** True for ids like file:<path>, sym:<path>::Name, ext:<module> with a non-empty tail. */
+function isSelectableNodeId(nodeId) {
+  return typeof nodeId === "string" && /^(file|sym|ext):.+/.test(nodeId);
+}
+
 /** Selects a node in the graph (clearing filters that hide it) and opens its detail panel. */
 function selectGraphNode(nodeId) {
+  if (!isSelectableNodeId(nodeId)) return; // e.g. repo-level findings have no node
   openNodePanel(nodeId);
   if (!cyInstance) return;
   const node = cyInstance.getElementById(nodeId);

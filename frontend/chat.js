@@ -1,8 +1,10 @@
 /**
  * Repo chat widget. Sessions via POST /api/chat/sessions; messages via
  * POST /api/chat/sessions/{id}/messages streamed as SSE (`data: {...}\n\n`).
- * Answers are rendered with textContent only (code fences become <pre>).
- * Requires util.js, api.js (ApiError, seg), graph.js (selectGraphNode), app.js (showWorkspaceTab).
+ * Event types: progress (stage), status, token, done (answer, citations, abstained,
+ * abstention_reason), error (message). Answers are rendered with textContent only.
+ * Requires util.js, api.js (ApiError, seg), ai.js (aiAvailable), graph.js (selectGraphNode),
+ * app.js (showWorkspaceTab).
  */
 
 const chatEls = {
@@ -19,6 +21,7 @@ const chatEls = {
   focusChip: document.getElementById("chat-focus"),
   focusLabel: document.getElementById("chat-focus-label"),
   focusClear: document.getElementById("chat-focus-clear"),
+  modelBanner: document.getElementById("chat-model-banner"),
 };
 
 const chatState = {
@@ -33,6 +36,17 @@ const CHAT_HTTP_FALLBACK = {
   402: "Your plan's chat limit has been reached.",
   429: "Too many messages. Wait a moment and try again.",
 };
+
+const PROGRESS_TEXT = {
+  validation: "Checking your question…",
+  retrieval: "Searching the codebase…",
+  retrieval_complete: "Found relevant code…",
+  context_assembly: "Gathering context…",
+  context_assembly_complete: "Reading relevant snippets…",
+  generation: "Writing answer…",
+};
+
+const ABSTAIN_FALLBACK = "Sherlock could not find enough evidence in this repository to answer.";
 
 function initChat() {
   chatEls.bubble.addEventListener("click", () => {
@@ -53,12 +67,18 @@ function initChat() {
     if (e.key === "Escape" && !chatEls.panel.classList.contains("hidden")) closeChatPanel();
   });
   renderEmptyHint();
+  renderModelBanner();
 }
 
 function renderEmptyHint() {
   chatEls.messages.replaceChildren(
     el("div", { className: "chat-empty" }, el("p", { text: "Ask anything about this repository." })),
   );
+}
+
+/** Shows a subtle notice in the chat panel when no AI model is available (no BYOK key, no platform model). */
+function renderModelBanner() {
+  chatEls.modelBanner.hidden = aiAvailable();
 }
 
 /** Called when a repo is opened (repoId) or the workspace closes (null). */
@@ -72,6 +92,7 @@ function setChatRepo(repoId) {
   chatEls.status.textContent = "";
   renderEmptyHint();
   renderFocus();
+  renderModelBanner();
   chatEls.widget.classList.toggle("hidden", !repoId);
   closeChatPanel();
 }
@@ -165,26 +186,39 @@ async function sendMessage() {
   }
 }
 
+/** HTTP failures become ApiError with the server's {"error"} message and parsed body (for `code`). */
 async function chatHttpError(res) {
-  let message = CHAT_HTTP_FALLBACK[res.status] || `Request failed (${res.status}).`;
+  let data = null;
   try {
-    const data = await res.json();
-    if (data && data.error) message = data.error;
+    data = await res.json();
   } catch (_err) {
-    // keep fallback message for non-JSON bodies
+    data = null; // non-JSON body: fall back to the status message
   }
-  return new ApiError(res.status, message);
+  const message = (data && data.error) || CHAT_HTTP_FALLBACK[res.status] || `Request failed (${res.status}).`;
+  return new ApiError(res.status, message, data);
 }
 
+function isNoModelError(err) {
+  return err instanceof ApiError && err.status === 409 && Boolean(err.body) && err.body.code === "no_model";
+}
+
+/** Shows the error in the reply bubble. Only fetch-level failures count as "network" errors. */
 function renderReplyError(reply, err) {
   const bubble = reply.querySelector(".chat-message-bubble");
+  reply.classList.add("error");
+  if (isNoModelError(err)) {
+    bubble.replaceChildren(
+      el("p", { className: "chat-notice", text: "Chat needs an AI model before it can answer." }),
+      el("a", { className: "chat-upgrade", href: "/settings#keys", text: "Add your API key to start chatting" }),
+    );
+    return;
+  }
   const message = err instanceof ApiError ? err.message : "Network error. Check your connection and try again.";
   const nodes = [el("p", { className: "chat-error", role: "alert", text: message })];
   if (err instanceof ApiError && err.status === 402) {
     nodes.push(el("a", { className: "chat-upgrade", href: "/settings?upgrade=pro", text: "Upgrade plan" }));
   }
   bubble.replaceChildren(...nodes);
-  reply.classList.add("error");
 }
 
 /** Parses one SSE event block (lines of `data: ...`). Returns null when there is no JSON payload. */
@@ -200,6 +234,47 @@ function parseSseEvent(block) {
   } catch (err) {
     console.warn("Skipping malformed chat event:", err);
     return null;
+  }
+}
+
+/** Friendly status text for a progress stage; unknown stages get a generic line. */
+function progressText(event) {
+  const count = Number(event.num_chunks ?? event.count);
+  if (event.stage === "context_assembly_complete" && Number.isFinite(count) && count > 0) {
+    return `Reading ${count} relevant snippets…`;
+  }
+  return PROGRESS_TEXT[event.stage] || "Working on your answer…";
+}
+
+/**
+ * Applies one SSE event to the reply. Returns the updated answer text and whether the stream finished.
+ * An `error` event throws ApiError(0, message): a stream failure, shown with the server's message.
+ */
+function applyChatEvent(event, reply, answer) {
+  switch (event.type) {
+    case "progress":
+      chatEls.status.textContent = progressText(event);
+      return { answer, finished: false };
+    case "status":
+      chatEls.status.textContent = event.message || event.text || "Sherlock is thinking...";
+      return { answer, finished: false };
+    case "token": {
+      const next = answer + (event.text || "");
+      renderAnswer(reply, next);
+      return { answer: next, finished: false };
+    }
+    case "done": {
+      const final = event.answer != null ? event.answer : answer;
+      chatEls.status.textContent = "";
+      renderAnswer(reply, final);
+      renderAbstention(reply, event);
+      renderCitations(reply, event.citations || []);
+      return { answer: final, finished: true };
+    }
+    case "error":
+      throw new ApiError(0, event.message || event.error || "The answer could not be generated.");
+    default:
+      return { answer, finished: false };
   }
 }
 
@@ -219,22 +294,21 @@ async function consumeChatStream(res, reply) {
     for (const block of blocks) {
       const event = parseSseEvent(block);
       if (!event) continue;
-      if (event.type === "token") {
-        answer += event.text || "";
-        renderAnswer(reply, answer);
-      } else if (event.type === "status") {
-        chatEls.status.textContent = event.message || event.text || "Sherlock is thinking...";
-      } else if (event.type === "done") {
-        finished = true;
-        answer = event.answer != null ? event.answer : answer;
-        renderAnswer(reply, answer);
-        renderCitations(reply, event.citations || []);
-      } else if (event.type === "error") {
-        throw new Error(event.message || event.error || "The answer could not be generated.");
-      }
+      const outcome = applyChatEvent(event, reply, answer);
+      answer = outcome.answer;
+      finished = finished || outcome.finished;
     }
   }
-  if (!finished) throw new Error("The connection closed before the answer finished.");
+  if (!finished) throw new ApiError(0, "The connection closed before the answer finished.");
+}
+
+/** Muted note for abstained answers (no answer text): the server's reason, or a generic line. */
+function renderAbstention(reply, event) {
+  if (!event.abstained) return;
+  const reason = typeof event.abstention_reason === "string" && event.abstention_reason.trim()
+    ? event.abstention_reason
+    : ABSTAIN_FALLBACK;
+  reply.querySelector(".chat-message-bubble").append(el("p", { className: "chat-abstain", text: reason }));
 }
 
 /** Renders answer text safely: plain paragraphs and ``` fenced blocks as <pre><code>. */

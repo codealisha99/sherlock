@@ -120,6 +120,18 @@ def test_settings_handles_checkout_banners():
     assert '"pro"' in src
 
 
+def test_landing_v2_feature_copy_matches_contract():
+    html = _read("landing.html")
+    for term in ("OSV", "AI verification", "Python", "JavaScript", "TypeScript", "Go", "Java", "Rust", "Ruby"):
+        assert term in html, f"landing.html must mention {term}"
+    # No invented statistics: percentages or counts are not allowed in marketing copy.
+    assert not re.search(r"\d+\s?%", html), "landing.html must not contain unverified percentages"
+
+
+def test_settings_byok_section_has_keys_anchor():
+    assert 'id="keys"' in _read("settings.html"), "settings.html needs the #keys anchor for chat links"
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
 @pytest.mark.parametrize("js", ["site.js", "landing.js", "auth.js", "settings.js"])
 def test_js_syntax(js):
