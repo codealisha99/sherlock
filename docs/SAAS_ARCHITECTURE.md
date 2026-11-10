@@ -148,3 +148,13 @@ Chat with no model available returns `409 {"error": "No AI model is configured. 
 
 ### Graph-aware chat
 With `focus`, the server builds extra context from the graph artifact: the node's source window, its incoming/outgoing neighbours (callers/callees/imports) with their source snippets (bounded), and the node's findings. Passed to `RAGPipeline.ask_stream(..., extra_context=[chunks])` and given priority in the context budget; cited like normal chunks.
+
+### v2 implementation notes
+- Symbol nodes from tree-sitter carry `end_line`; `node_detail` shows `line..end_line` (≤200 lines). Non-Python symbols report `metrics.loc` from their line span and omit `complexity` (not measured) rather than reporting 0.
+- `self.x()` / `this.x()` / Go receiver calls resolve to the enclosing class's method first (Python also checks same-repo base classes).
+- Graph node `findings`/`health` are recomputed at read time from `findings.json`, so AI false positives stop colouring nodes immediately.
+- Default triage batch is ordered most-severe first (critical → medium) before the 15-finding cap.
+- Minified/bundled JS/CSS (`*.min.*`, `*.bundle.*`, or average line length > 200) is skipped at index time and listed in `skipped_files`.
+- `/api/ask` and `/api/ask/stream` return 409 (no model) before consuming chat quota, like the chat-session route.
+- The embedding model is loaded once per process (shared, lock-guarded client) instead of per request.
+- Chat focus ids may contain `$`, `?`, `!` (JS `$el`, Ruby `valid?`/`save!`); whitespace, quotes and brackets are still rejected.
