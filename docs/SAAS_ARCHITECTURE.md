@@ -118,3 +118,33 @@ the frontend. **Do not change a contract without updating this file.**
 - Clone safety: https://github.com only, strict owner/repo regex, `git clone --depth 1 --no-tags --single-branch` with hooks disabled, `GIT_TERMINAL_PROMPT=0`, timeout, size cap, symlinks not followed.
 - Webhooks: HMAC-SHA256 `Stripe-Signature` verification with 5-min tolerance, event-id idempotency.
 - Security headers on API: CSP, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`.
+
+## v2 additions (findings quality, multi-language graph, AI)
+
+### Dependency CVEs (`app/saas/dep_audit.py`)
+New job stage `auditing` (between `scanning` and `graphing`). Parses `requirements*.txt`, `pyproject.toml` (PEP 621 + Poetry), `Pipfile.lock`, `poetry.lock`, `package.json`, `package-lock.json` (v2/v3), `yarn.lock` (v1), `go.mod`, `Cargo.lock`, and queries the OSV.dev `querybatch` API. Network failure → job continues; `summary.dependencies.error` explains.
+Dependency findings use the normal finding shape plus:
+```json
+{"category": "dependency", "rule_id": "dep-vuln", "package": "requests", "version": "2.19.0",
+ "ecosystem": "PyPI", "advisory_ids": ["GHSA-...", "CVE-..."], "fixed_versions": ["2.20.0"],
+ "references": ["https://osv.dev/vulnerability/GHSA-..."]}
+```
+`summary.dependencies` = `{"scanned": 42, "vulnerable": 3, "ecosystems": ["PyPI"], "manifests": ["requirements.txt"], "error": null}`.
+
+### Noise reduction
+Low-value per-symbol rules (`q-docstring`, `q-no-tests`) are aggregated: at most one finding per file (docstrings) and one repo-level `q-no-tests` finding listing untested modules. Aggregated findings carry `"occurrences": [{"file_path", "line"}]` and `"count"`. Findings get `"confidence": "high"|"medium"|"low"`. Score only penalizes medium+ confidence.
+
+### Multi-language graph (`app/saas/lang_parse.py`)
+tree-sitter parses JS/TS/TSX/Go/Java/Rust/Ruby (Python stays on stdlib `ast`): classes/functions/methods → graph symbol nodes (`sym:<path>::<Qual.Name>`), imports → edges, simple call resolution → `calls` edges. Falls back to regex if a grammar is missing.
+
+### AI triage
+- `GET /api/capabilities` (public) → `{"platform_model": bool, "platform_model_name": str|null}`. With a user cookie also returns `{"byok": bool}`.
+- `POST /api/repos/{repo_id}/triage` `{finding_ids?: [...]}` (default: up to 15 untriaged security/secrets/dependency findings with severity ≥ medium) → `{findings: [...updated...], triaged: n, skipped: n}`. Uses the caller's BYOK key, else the platform model; 409 `{"error": "No AI model available..."}` if neither. Each triage counts 1 chat-quota unit per finding (402 when exhausted). Rate bucket `triage` (5/min).
+- Finding gains `"triage": {"verdict": "confirmed"|"likely"|"false_positive"|"uncertain", "confidence": 0.0-1.0, "explanation": str, "fix": str|null, "model": str, "triaged_at": iso}`. Summary gains `"triaged": n, "false_positives": n`; false positives are excluded from the score.
+
+### Hosted default model
+Env `SHERLOCK_LLM_PROVIDER` (openai|anthropic|groq|openrouter|custom) + `SHERLOCK_LLM_API_KEY` (+ optional `SHERLOCK_LLM_MODEL`, `SHERLOCK_LLM_BASE_URL`). When set, chat and triage work without BYOK; usage is bounded by plan quotas. Legacy `GROQ_API_KEY`/`LLM_PROVIDER` still work.
+Chat with no model available returns `409 {"error": "No AI model is configured. Add your own API key in Settings.", "code": "no_model"}` **before** streaming.
+
+### Graph-aware chat
+With `focus`, the server builds extra context from the graph artifact: the node's source window, its incoming/outgoing neighbours (callers/callees/imports) with their source snippets (bounded), and the node's findings. Passed to `RAGPipeline.ask_stream(..., extra_context=[chunks])` and given priority in the context budget; cited like normal chunks.

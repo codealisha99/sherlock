@@ -56,6 +56,9 @@ ROUTE_SPECS: List[Tuple[str, str, str, bool, str]] = [
     ("GET", r"/api/repos/(?P<repo_id>[A-Za-z0-9_.:-]{1,128})/graph", "app.saas.ingest_routes:get_graph", True, "api"),
     ("GET", r"/api/repos/(?P<repo_id>[A-Za-z0-9_.:-]{1,128})/findings", "app.saas.ingest_routes:get_findings", True, "api"),
     ("GET", r"/api/repos/(?P<repo_id>[A-Za-z0-9_.:-]{1,128})/node", "app.saas.ingest_routes:get_node", True, "api"),
+    ("POST", r"/api/repos/(?P<repo_id>[A-Za-z0-9_.:-]{1,128})/triage", "app.saas.triage_routes:triage", True, "triage"),
+    # --- platform capabilities (public)
+    ("GET", r"/api/capabilities", "app.saas.triage_routes:capabilities", False, "api"),
 ]
 
 CSRF_EXEMPT = {"/api/billing/webhook"}

@@ -19,6 +19,7 @@ BUCKETS: Dict[str, Tuple[int, float]] = {
     "ingest": (5, 60.0),
     "webhook": (300, 60.0),
     "chat": (20, 60.0),
+    "triage": (5, 60.0),
 }
 DEFAULT_BUCKET = "api"
 MAX_KEYS = 50_000
